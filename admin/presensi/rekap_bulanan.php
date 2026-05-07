@@ -116,20 +116,21 @@ else{
           $jam_masuk_raw  = trim((string)($rekap['jam_masuk'] ?? ''));
           $jam_keluar_raw = trim((string)($rekap['jam_keluar'] ?? '00:00:00'));
           $tanggal_raw    = trim((string)($rekap['tanggal_masuk'] ?? ''));
-          $status_db      = $rekap['status']; // MANGGIL STATUS ASLI DARI DB
+          $status_db      = $rekap['status']; // INI JANGKARNYA: Ambil status asli yang sudah kesimpan
           $hari_ini       = date('Y-m-d');
 
-          // 2. Inisialisasi Tampilan Kolom
+          // 2. Inisialisasi Tampilan
           $jam_pulang_display = "";
           $foto_keluar_display = "";
           $total_jam_display = "";
           $status_final_badge = "";
 
-          // --- LOGIKA TAMPILAN (BUKAN LOGIKA HITUNG ULANG STATUS) ---
+          // --- LOGIKA TAMPILAN (TANPA HITUNG ULANG TOLERANSI) ---
           
-          // A. Cek Total Jam Kerja (Hanya jika sudah pulang)
+          // A. Logika Jam Pulang & Total Jam
           if ($jam_keluar_raw !== '00:00:00' && !empty($jam_keluar_raw)) {
               $jam_pulang_display = $jam_keluar_raw;
+              // Hitung selisih jam kerja
               $ts_masuk  = strtotime($tanggal_raw . ' ' . $jam_masuk_raw);
               $ts_keluar = strtotime($tanggal_raw . ' ' . $jam_keluar_raw);
               if ($ts_keluar < $ts_masuk) { $ts_keluar = strtotime('+1 day', $ts_keluar); }
@@ -146,18 +147,21 @@ else{
               }
           }
 
-          // B. Tampilkan Badge Berdasarkan Status di Database
-          if ($status_db == 'Hadir') {
+          // B. Logika Warna Badge Berdasarkan Status di DB
+          // Kita pakai status asli dari DB supaya konsisten
+          if ($status_db == 'Hadir' || $status_db == 'On Time') {
               $status_final_badge = "<span class='badge bg-success text-white'>On Time</span>";
           } elseif ($status_db == 'Terlambat') {
               $status_final_badge = "<span class='badge bg-warning text-white'>Terlambat</span>";
-          } elseif ($tanggal_raw < $hari_ini && $jam_keluar_raw == '00:00:00') {
+          } elseif ($tanggal_raw < $hari_ini && ($jam_keluar_raw == '00:00:00' || empty($jam_keluar_raw))) {
+              // Khusus yang bolos pulang di hari lampau
               $status_final_badge = "<span class='badge bg-danger text-white'>Alpa</span>";
           } else {
+              // Untuk status Izin, Sakit, atau lainnya
               $status_final_badge = "<span class='badge bg-info text-white'>$status_db</span>";
           }
         ?>
-        
+
           <tr>
             <td><?= $no++; ?></td>
             <td><?= htmlspecialchars($rekap['nama']); ?></td>
