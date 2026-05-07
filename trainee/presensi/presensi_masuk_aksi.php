@@ -7,12 +7,10 @@ include_once('../../config.php');
 date_default_timezone_set('Asia/Jakarta');
 $lokasi_user = $_SESSION['lokasi_presensi'];
 
-// --- PERBAIKAN 1: Ambil jam_masuk DAN toleransi dari database ---
-$query_lokasi = mysqli_query($connection, "SELECT jam_masuk, toleransi FROM lokasi_presensi WHERE nama_lokasi = '$lokasi_user'");
+// Ambil jam masuk yang disetting HR di database
+$query_lokasi = mysqli_query($connection, "SELECT jam_masuk FROM lokasi_presensi WHERE nama_lokasi = '$lokasi_user'");
 $data_lokasi = mysqli_fetch_array($query_lokasi);
-
 $jam_buka_db = $data_lokasi['jam_masuk'];
-$toleransi   = $data_lokasi['toleransi']; // Ambil nilai toleransi dinamis
 
 // Proteksi: Gak boleh absen sebelum jam buka (Server Side Check)
 if (date('H:i:s') < $jam_buka_db) {
@@ -26,7 +24,7 @@ if (!isset($_SESSION['login'])) {
     exit;
 }
 
-$id_trainee = (int)($_POST['id'] ?? 0); 
+$id_trainee = (int)($_POST['id'] ?? 0); // Ambil ID dari POST yang dikirim AJAX
 $file_foto  = $_POST['photo'] ?? '';
 
 if ($id_trainee <= 0) {
@@ -41,12 +39,12 @@ if (!$file_foto) {
     exit;
 }
 
-/* 1) WAKTU DARI SERVER & LOGIKA TERLAMBAT (Dinamis sesuai Database) */
+/* 1) WAKTU DARI SERVER & LOGIKA TERLAMBAT (+45 Menit) */
 $tanggal_masuk = date('Y-m-d');
-$jam_masuk_skrg = date('H:i:s'); 
+$jam_masuk_skrg = date('H:i:s'); // Menggunakan jam server murni agar anti-cheat total
 
-// --- PERBAIKAN 2: Batas telat dihitung berdasarkan variabel $toleransi ---
-$batas_terlambat = date('H:i:s', strtotime($jam_buka_db . " +$toleransi minutes"));
+// Hitung batas telat: Jam Buka + 45 Menit
+$batas_terlambat = date('H:i:s', strtotime($jam_buka_db . ' +45 minutes'));
 
 // Tentukan status secara otomatis
 if ($jam_masuk_skrg > $batas_terlambat) {
@@ -80,6 +78,7 @@ if (!is_dir('foto')) {
     mkdir('foto', 0777, true);
 }
 
+// Penamaan file lebih rapi
 $file = 'masuk_' . $id_trainee . '_' . date('Ymd_His') . '.png';
 $nama_file = 'foto/' . $file;
 

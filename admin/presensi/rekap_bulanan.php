@@ -112,56 +112,73 @@ else{
         <?php 
         $no = 1;
         foreach($result as $rekap):
-          // 1. Ambil Data Dasar dari Database
+          // 1. Ambil Data Dasar
           $jam_masuk_raw  = trim((string)($rekap['jam_masuk'] ?? ''));
           $jam_keluar_raw = trim((string)($rekap['jam_keluar'] ?? '00:00:00'));
           $tanggal_raw    = trim((string)($rekap['tanggal_masuk'] ?? ''));
-          $status_db      = $rekap['status']; // INI JANGKARNYA: Ambil status asli yang sudah kesimpan
           $hari_ini       = date('Y-m-d');
 
-          // 2. Inisialisasi Tampilan
+          // 2. Ambil Aturan Jam Masuk Kantor & Hitung Toleransi (40 Menit)
+          $lokasi_presensi = $rekap['lokasi_presensi'];
+          $lokasi_q = mysqli_query($connection, "SELECT jam_masuk FROM lokasi_presensi WHERE nama_lokasi = '$lokasi_presensi'");
+          $lokasi_res = mysqli_fetch_array($lokasi_q);
+          $jam_masuk_kantor = $lokasi_res['jam_masuk'];
+          $jam_batas_telat = date('H:i:s', strtotime($jam_masuk_kantor . ' +40 minutes'));
+
+          // 3. Tentukan Status Terlambat
+          $jam_masuk_trainee = date('H:i:s', strtotime($jam_masuk_raw));
+          $is_telat = strtotime($jam_masuk_trainee) > strtotime($jam_batas_telat);
+          
+          $diff_terlambat = strtotime($jam_masuk_trainee) - strtotime($jam_batas_telat);
+          $jam_telat = floor($diff_terlambat / 3600);
+          $menit_telat = floor(($diff_terlambat % 3600) / 60);
+
+          // 4. Inisialisasi Tampilan Kolom
           $jam_pulang_display = "";
           $foto_keluar_display = "";
           $total_jam_display = "";
           $status_final_badge = "";
 
-          // --- LOGIKA TAMPILAN (TANPA HITUNG ULANG TOLERANSI) ---
-          
-          // A. Logika Jam Pulang & Total Jam
+          // --- LOGIKA UTAMA PENENTUAN STATUS ---
           if ($jam_keluar_raw !== '00:00:00' && !empty($jam_keluar_raw)) {
+              // KONDISI: SUDAH PRESENSI PULANG
               $jam_pulang_display = $jam_keluar_raw;
-              // Hitung selisih jam kerja
+              
+              // Hitung Total Jam Kerja
               $ts_masuk  = strtotime($tanggal_raw . ' ' . $jam_masuk_raw);
               $ts_keluar = strtotime($tanggal_raw . ' ' . $jam_keluar_raw);
               if ($ts_keluar < $ts_masuk) { $ts_keluar = strtotime('+1 day', $ts_keluar); }
               $selisih = $ts_keluar - $ts_masuk;
               $total_jam_display = floor($selisih / 3600) . " jam " . floor(($selisih % 3600) / 60) . " menit";
-          } else {
-              if ($tanggal_raw < $hari_ini) {
-                  $jam_pulang_display = "-";
-                  $total_jam_display = "Tidak presensi pulang";
-                  $foto_keluar_display = "Tidak presensi pulang";
+
+              // Badge dengan Teks Putih
+              if (!$is_telat) {
+                  $status_final_badge = "<span class='badge bg-success text-white'>On Time</span>";
               } else {
+                  $status_final_badge = "<span class='badge bg-warning text-white'>Terlambat</span><br><small class='text-muted'>Telat: {$jam_telat}j {$menit_telat}m</small>";
+              }
+          } else {
+              // KONDISI: BELUM PRESENSI PULANG
+              if ($tanggal_raw < $hari_ini) {
+                  // SUB-KONDISI: LEWAT HARI (Vonis Alpa)
+                  $jam_pulang_display = "-";
+                  $status_final_badge = "<span class='badge bg-danger text-white'>Alpa</span><br><small class='text-danger' style='font-size:10px;'>Tidak presensi pulang</small>";
+                  $foto_keluar_display = "<span class='text-muted' style='font-size:11px;'>Tidak melakukan presensi pulang.</span>";
+                  $total_jam_display = "<span class='text-muted' style='font-size:11px;'>Tidak presensi pulang</span>";
+              } else {
+                  // SUB-KONDISI: HARI INI (Sedang Bekerja)
+                  $jam_pulang_display = ""; 
+                  $foto_keluar_display = "<span class='text-muted' style='font-size:11px;'>Belum melakukan presensi pulang.</span>";
                   $total_jam_display = "Sedang bekerja";
-                  $foto_keluar_display = "Belum presensi pulang";
+                  
+                  if (!$is_telat) {
+                      $status_final_badge = "<span class='badge bg-success text-white'>On Time</span>";
+                  } else {
+                      $status_final_badge = "<span class='badge bg-warning text-white'>Terlambat</span><br><small class='text-muted'>Telat: {$jam_telat}j {$menit_telat}m</small>";
+                  }
               }
           }
-
-          // B. Logika Warna Badge Berdasarkan Status di DB
-          // Kita pakai status asli dari DB supaya konsisten
-          if ($status_db == 'Hadir' || $status_db == 'On Time') {
-              $status_final_badge = "<span class='badge bg-success text-white'>On Time</span>";
-          } elseif ($status_db == 'Terlambat') {
-              $status_final_badge = "<span class='badge bg-warning text-white'>Terlambat</span>";
-          } elseif ($tanggal_raw < $hari_ini && ($jam_keluar_raw == '00:00:00' || empty($jam_keluar_raw))) {
-              // Khusus yang bolos pulang di hari lampau
-              $status_final_badge = "<span class='badge bg-danger text-white'>Alpa</span>";
-          } else {
-              // Untuk status Izin, Sakit, atau lainnya
-              $status_final_badge = "<span class='badge bg-info text-white'>$status_db</span>";
-          }
         ?>
-
           <tr>
             <td><?= $no++; ?></td>
             <td><?= htmlspecialchars($rekap['nama']); ?></td>
