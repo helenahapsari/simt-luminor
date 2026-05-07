@@ -15,7 +15,7 @@ include('../layout/header.php');
 // --- PERUBAHAN: Query menggunakan JOIN untuk mengambil kolom Nama dari tabel Trainee ---
 $result = mysqli_query($connection, "SELECT ketidakhadiran.*, trainee.nama 
                                      FROM ketidakhadiran 
-                                     JOIN trainee ON ketidakhadiran.id_trainee = trainee.id_trainee 
+                                     JOIN trainee ON ketidakhadiran.id_trainee = trainee.id 
                                      ORDER BY ketidakhadiran.id DESC");
 ?>
 
