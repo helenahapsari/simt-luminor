@@ -12,21 +12,20 @@ else if($_SESSION['role'] != 'Admin'){
 $judul = 'Data Ketidakhadiran';
 include('../layout/header.php');
 
-$result = mysqli_query($connection, "SELECT * FROM ketidakhadiran ORDER BY id DESC");
-
-// print_r(mysqli_fetch_array($result));
-// die;
-
+// --- PERUBAHAN: Query menggunakan JOIN untuk mengambil kolom Nama dari tabel Trainee ---
+$result = mysqli_query($connection, "SELECT ketidakhadiran.*, trainee.nama 
+                                     FROM ketidakhadiran 
+                                     JOIN trainee ON ketidakhadiran.id_trainee = trainee.id_trainee 
+                                     ORDER BY ketidakhadiran.id DESC");
 ?>
 
-<!-- Page body -->
 <div class="page-body">
   <div class="container-xl">
 
   <table class="table table-bordered">
       <tr class="text-center">
         <th>No.</th>
-        <th>Tanggal</th>
+        <th>Nama</th> <th>Tanggal</th>
         <th>Keterangan</th>
         <th>Deskripsi</th>
         <th>File</th>
@@ -35,15 +34,14 @@ $result = mysqli_query($connection, "SELECT * FROM ketidakhadiran ORDER BY id DE
 
       <?php if(mysqli_num_rows($result) === 0){ ?>
         <tr>
-          <td colspan="6">Data ketidakhadiran masih kosong.</td>
-        </tr>
+          <td colspan="7" class="text-center">Data ketidakhadiran masih kosong.</td> </tr>
       <?php }
       else{
         $no = 1;
         while($data = mysqli_fetch_array($result)): ?>
         <tr>
           <td><?= $no++; ?></td>
-          <td><?= date('d F Y', strtotime($data['tanggal'])) ?></td>
+          <td><?= $data['nama']; ?></td> <td><?= date('d F Y', strtotime($data['tanggal'])) ?></td>
           <td><?= $data['keterangan']; ?></td>
           <td><?= $data['deskripsi']; ?></td>
           <td class="text-center">
@@ -67,13 +65,7 @@ $result = mysqli_query($connection, "SELECT * FROM ketidakhadiran ORDER BY id DE
 
     </table>
 
-  
-
   </div>
 </div>
-
-
-
-
 
 <?php include('../layout/footer.php'); ?>
