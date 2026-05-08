@@ -610,35 +610,39 @@ new Chart(document.getElementById('chartJam'), {
     }
 });
 
+// 8. Persentase Kedisiplinan Trainee (Bulan Ini) - FIX KOSONG
 new Chart(document.getElementById('chartDisiplin'), {
-    // ... kode lain ...
+    type: 'doughnut', // Pastikan type tertulis jelas di sini
+    plugins: [ChartDataLabels],
     data: {
         labels: ['Tepat Waktu', 'Terlambat'],
         datasets: [{
-            // PAKAI VARIABEL BARU TADI
-            data: [<?= $tepat_bulan_final ?>, <?= $telat_bulan_final ?>], 
+            data: [
+                <?= (int)($tepat_bulan_final ?? 0) ?>, 
+                <?= (int)($telat_bulan_final ?? 0) ?>
+            ], 
             backgroundColor: ['#2fb344', '#f59f00']
         }]
     },
-    // ... kode lain ...
     options: {
         cutout: '65%',
+        responsive: true,
+        maintainAspectRatio: false,
         plugins: {
             legend: {
-                position: 'bottom'
+                position: 'bottom',
+                display: true
             },
             datalabels: {
                 color: '#fff',
                 font: { weight: 'bold', size: 13 },
-                // BIAR CHART YANG NGITUNG PERSENNYA SECARA OTOMATIS
                 formatter: (value, ctx) => {
                     let sum = 0;
                     let dataArr = ctx.chart.data.datasets[0].data;
                     dataArr.map(data => { sum += data; });
-                    // Kalau datanya 0, jangan tampilkan label biar nggak error NaN%
-                    if (sum === 0) return null; 
+                    if (sum === 0) return ''; 
                     let percentage = (value * 100 / sum).toFixed(0) + "%";
-                    return percentage;
+                    return value > 0 ? percentage : '';
                 }
             }
         }
