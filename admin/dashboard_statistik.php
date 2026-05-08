@@ -117,12 +117,11 @@ $alpa += $alpa_masuk;
 $m_safe = sprintf("%02d", $filter_bulan); 
 
 $q_div = mysqli_query($connection, "SELECT nama_divisi, 
-    COUNT(CASE WHEN status = 'Tepat Waktu' THEN 1 END) as h_tepat,
+    COUNT(CASE WHEN status = 'On Time' THEN 1 END) as h_tepat,
     COUNT(CASE WHEN status LIKE '%Terlambat%' THEN 1 END) as h_telat
     FROM trainee 
     LEFT JOIN presensi ON trainee.id = presensi.id_trainee 
     AND tanggal_masuk = '$filter_tanggal'
-    -- FILTER UNTUK MENGHILANGKAN HRD MANAGER --
     WHERE nama_divisi != 'HRD Manager'
     GROUP BY nama_divisi");
 
@@ -196,7 +195,7 @@ $q_jam = mysqli_query($connection, "SELECT
 $d_jam = mysqli_fetch_assoc($q_jam);
 
 $q_bulanan = mysqli_query($connection, "SELECT 
-    COUNT(CASE WHEN status = 'Hadir' THEN 1 END) as tepat, 
+    COUNT(CASE WHEN status = 'On Time' THEN 1 END) as tepat, 
     COUNT(CASE WHEN status LIKE '%Terlambat%' THEN 1 END) as telat
     FROM presensi
     WHERE MONTH(tanggal_masuk) = '$filter_bulan'
@@ -204,7 +203,7 @@ $q_bulanan = mysqli_query($connection, "SELECT
 
 $d_bulanan = mysqli_fetch_assoc($q_bulanan);
 
-// Ambil angka aslinya saja, jangan dipersentasekan di PHP
+// Ambil angka aslinya
 $tepat = (int)$d_bulanan['tepat'];
 $telat = (int)$d_bulanan['telat'];
 
