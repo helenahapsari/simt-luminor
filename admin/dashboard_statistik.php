@@ -79,7 +79,7 @@ while ($row = mysqli_fetch_assoc($q_all)) {
     $is_telat = strtotime($jam_masuk) > strtotime($batas_telat);
 
     // LOGIC SESUAI REKAP
-    if (!empty($jam_keluar) && $jam_keluar != '00:00:00') {
+    if (!is_null($jam_keluar) && $jam_keluar != '00:00:00') {
 
         if ($is_telat) {
             $telat++;
@@ -110,14 +110,12 @@ $total_trainee = mysqli_fetch_assoc($q_total)['total'];
 
 // HITUNG ALPA FINAL
 $alpa = $total_trainee - ($tepat + $telat + $izin);
-$alpa += $alpa_masuk;
-
 
 // Tambahkan baris ini SEBELUM query untuk memastikan format bulan selalu 2 digit (01, 02, dst)
 $m_safe = sprintf("%02d", $filter_bulan); 
 
 $q_div = mysqli_query($connection, "SELECT nama_divisi, 
-    COUNT(CASE WHEN status = 'On Time' THEN 1 END) as h_tepat,
+    COUNT(CASE WHEN status = 'Tepat Waktu' THEN 1 END) as h_tepat,
     COUNT(CASE WHEN status LIKE '%Terlambat%' THEN 1 END) as h_telat
     FROM trainee 
     LEFT JOIN presensi ON trainee.id = presensi.id_trainee 
