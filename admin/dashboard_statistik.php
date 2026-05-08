@@ -47,94 +47,70 @@ $filter_tanggal = $_GET['tanggal'] ?? date('Y-m-d');
 $filter_bulan = date('m', strtotime($filter_tanggal));
 $filter_tahun = date('Y', strtotime($filter_tanggal));
 
-// --- 1. DATA SNAPSHOT HARI INI (FIX TOTAL FINAL) ---
-
+// --- 1. DATA SNAPSHOT HARI INI (LOGIKA ANTI-DOUBLE & ANTI-GANTUNG) ---
 $tepat = 0;
 $telat = 0;
-$izin = 0;
-$hadir_ids = [];
+$hadir_ids = []; 
+$hari_ini_skrg = date('Y-m-d'); // Tanggal asli hari ini
 
-// Ambil semua presensi hari ini
+// A. Ambil yang PRESENSI dulu
 $q_all = mysqli_query($connection, "
-SELECT 
-    p.*, 
-    t.lokasi_presensi,
-    l.jam_masuk as jam_kantor
-FROM presensi p
-JOIN trainee t ON t.id = p.id_trainee
-JOIN lokasi_presensi l ON l.nama_lokasi = t.lokasi_presensi
-WHERE DATE(p.tanggal_masuk) = '$filter_tanggal'
+    SELECT p.id_trainee, p.status_disiplin, p.jam_keluar, DATE(p.tanggal_masuk) as tgl_m
+    FROM presensi p 
+    JOIN trainee t ON p.id_trainee = t.id
+    WHERE DATE(p.tanggal_masuk) = '$filter_tanggal'
+    AND t.nama_divisi != 'HRD Manager'
 ");
 
 while ($row = mysqli_fetch_assoc($q_all)) {
-
-    $id_trainee = $row['id_trainee'];
-    $jam_masuk = $row['jam_masuk'];
-    $jam_keluar = $row['jam_keluar'];
-    $tanggal = $row['tanggal_masuk'];
-    $jam_kantor = $row['jam_kantor'];
-
-    $hari_ini = date('Y-m-d');
-
-    // Tandain dia pernah presensi
-    $hadir_ids[] = $id_trainee;
-
-    // CEK: kalau sudah lewat hari dan tidak presensi pulang → ALPA
-    if ($tanggal < $hari_ini && (empty($jam_keluar) || $jam_keluar == '00:00:00')) {
-        continue; // SKIP → nanti dihitung sebagai alpa
+    // FILTER ALPA GANTUNG: Kalau tanggal sudah lewat dan gak absen pulang, JANGAN dihitung hadir
+    if ($row['tgl_m'] < $hari_ini_skrg && (empty($row['jam_keluar']) || $row['jam_keluar'] == '00:00:00')) {
+        continue; // Skip, orang ini otomatis jadi Alpa
     }
 
-    // Kalau ada jam masuk → hitung hadir
-    if (!empty($jam_masuk)) {
-
-        $batas_telat = date('H:i:s', strtotime("+40 minutes", strtotime($jam_kantor)));
-        $is_telat = strtotime($jam_masuk) > strtotime($batas_telat);
-
-        if ($is_telat) {
-            $telat++;
-        } else {
-            $tepat++;
-        }
-
+    $hadir_ids[] = $row['id_trainee']; 
+    
+    if ($row['status_disiplin'] == 'Terlambat') {
+        $telat++;
+    } else {
+        $tepat++;
     }
 }
 
-// Ambil IZIN / SAKIT (yang APPROVE)
+// B. Ambil yang IZIN (Tapi filter: kalau dia udah ada di $hadir_ids, JANGAN DIHITUNG IZIN)
+$izin_ids = [];
 $q_izin = mysqli_query($connection, "
-SELECT DISTINCT id_trainee
-FROM ketidakhadiran
-WHERE status_pengajuan = 'Approve'
-AND DATE(tanggal) = '$filter_tanggal'
+    SELECT DISTINCT k.id_trainee 
+    FROM ketidakhadiran k
+    JOIN trainee t ON k.id_trainee = t.id
+    WHERE k.status_pengajuan = 'Approve' 
+    AND DATE(k.tanggal) = '$filter_tanggal'
+    AND t.nama_divisi != 'HRD Manager'
 ");
 
-$izin_ids = [];
 while ($row = mysqli_fetch_assoc($q_izin)) {
-    $izin_ids[] = $row['id_trainee'];
-}
-
-$izin = count($izin_ids);
-
-// Total trainee
-$q_total = mysqli_query($connection, "SELECT COUNT(*) as total FROM trainee");
-$total_trainee = mysqli_fetch_assoc($q_total)['total'];
-
-// HITUNG ALPA (FINAL PALING AMAN)
-$alpa = 0;
-
-$q_all_trainee = mysqli_query($connection, "SELECT id FROM trainee");
-
-while ($t = mysqli_fetch_assoc($q_all_trainee)) {
-    $id = $t['id'];
-
-    if (!in_array($id, $hadir_ids) && !in_array($id, $izin_ids)) {
-        $alpa++;
+    // CEK: Kalau Helena sudah absen masuk, data izinnya kita cuekin
+    if (!in_array($row['id_trainee'], $hadir_ids)) {
+        $izin_ids[] = $row['id_trainee'];
     }
 }
+$izin = count($izin_ids);
+
+// C. Total Trainee (Tetap 23)
+$q_total = mysqli_query($connection, "SELECT COUNT(*) as total FROM trainee WHERE nama_divisi != 'HRD Manager'");
+$total_trainee = mysqli_fetch_assoc($q_total)['total'];
+
+// D. HITUNG ALPA
+// Gabungkan semua orang yang "terdata" (sudah difilter di atas)
+$semua_terdata = array_unique(array_merge($hadir_ids, $izin_ids));
+$jumlah_terdata = count($semua_terdata);
+
+$alpa = $total_trainee - $jumlah_terdata;
+
 
 // Tambahkan baris ini SEBELUM query untuk memastikan format bulan selalu 2 digit (01, 02, dst)
 $m_safe = sprintf("%02d", $filter_bulan); 
 
-// --- 2. DATA PER DIVISI (UNTUK CHART KIRI & KANAN) ---
 // --- 2. DATA PER DIVISI (FIX SINKRON: TOTAL 3) ---
 $q_div = mysqli_query($connection, "
 SELECT 
@@ -142,6 +118,7 @@ SELECT
     p.jam_masuk,
     p.jam_keluar,
     p.tanggal_masuk,
+    p.status_disiplin, -- TAMBAHKAN KOLOM INI
     l.jam_masuk as jam_kantor
 FROM trainee t
 LEFT JOIN presensi p ON t.id = p.id_trainee 
@@ -151,7 +128,9 @@ WHERE t.nama_divisi != 'HRD Manager'
 ");
 
 $divisi_data = [];
-$hari_ini = date('Y-m-d');
+
+// Reset pointer query biar aman
+mysqli_data_seek($q_div, 0);
 
 while ($row = mysqli_fetch_assoc($q_div)) {
     $div = $row['nama_divisi'];
@@ -160,24 +139,18 @@ while ($row = mysqli_fetch_assoc($q_div)) {
         $divisi_data[$div] = ['tepat' => 0, 'telat' => 0];
     }
 
-    $jam_masuk = $row['jam_masuk'];
-    $jam_keluar = $row['jam_keluar'];
-    $tanggal = $row['tanggal_masuk'];
-    $jam_kantor = $row['jam_kantor'];
+    $jam_masuk     = $row['jam_masuk'];
+    $jam_keluar    = $row['jam_keluar'];
+    $tanggal_p     = $row['tanggal_masuk'];
+    $status_db     = $row['status_disiplin'];
 
-    // LOGIKA SINKRON: Cek jam masuk dulu
     if (!empty($jam_masuk)) {
-        
-        // CEK ALPA: Kalau tanggalnya sudah lewat dan gak ada jam keluar, JANGAN DIHITUNG
-        if ($tanggal < $hari_ini && (empty($jam_keluar) || $jam_keluar == '00:00:00')) {
+        // CEK ALPA GANTUNG (Sama dengan logika Card atas)
+        if ($tanggal_p < $hari_ini_skrg && (empty($jam_keluar) || $jam_keluar == '00:00:00')) {
             continue; 
         }
 
-        // Hitung status Tepat/Telat
-        $batas_telat = date('H:i:s', strtotime($jam_kantor . ' +40 minutes'));
-        $is_telat = strtotime($jam_masuk) > strtotime($batas_telat);
-
-        if ($is_telat) {
+        if ($status_db == 'Terlambat') {
             $divisi_data[$div]['telat']++;
         } else {
             $divisi_data[$div]['tepat']++;
@@ -185,17 +158,17 @@ while ($row = mysqli_fetch_assoc($q_div)) {
     }
 }
 
-// --- Convert ke format Chart.js ---
+// --- Convert ke format Chart.js (Tetap sama) ---
 $labels_div = [];
 $data_tepat_div = [];
 $data_telat_div = [];
 $data_total_div = [];
 
 foreach ($divisi_data as $div => $val) {
-    $labels_div[] = $div;
-    $data_tepat_div[] = (int)$val['tepat'];
-    $data_telat_div[] = (int)$val['telat'];
-    $data_total_div[] = (int)($val['tepat'] + $val['telat']); // Ini yang bikin Pie Chart jadi 3
+    $labels_div[]      = $div;
+    $data_tepat_div[]  = (int)$val['tepat'];
+    $data_telat_div[]  = (int)$val['telat'];
+    $data_total_div[]  = (int)($val['tepat'] + $val['telat']); 
 }
 
 // --- 4. TOP 5 TRAINEE PALING RAJIN (DENGAN LOGIKA DISIPLIN) ---
