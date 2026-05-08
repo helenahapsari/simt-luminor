@@ -25,13 +25,6 @@ if(empty($_GET['tanggal_dari'])){
   $tanggal_sampai = $_GET['tanggal_sampai'];
   $result = mysqli_query($connection, "SELECT * FROM presensi WHERE id_trainee = '$id' AND tanggal_masuk BETWEEN '$tanggal_dari' AND '$tanggal_sampai' ORDER BY tanggal_masuk DESC");
 }
-
-// Ambil Jam Masuk Kantor dari Lokasi (Toleransi 40 Menit)
-$lokasi_user = $_SESSION['lokasi_presensi'];
-$l_query = mysqli_query($connection, "SELECT jam_masuk FROM lokasi_presensi WHERE nama_lokasi = '$lokasi_user'");
-$l_data = mysqli_fetch_array($l_query);
-$jam_masuk_kantor = $l_data['jam_masuk'] ?? '07:30:00';
-$jam_batas_telat = date('H:i:s', strtotime($jam_masuk_kantor . ' +40 minutes'));
 ?>
 
 <div class="page-body">
@@ -47,8 +40,8 @@ $jam_batas_telat = date('H:i:s', strtotime($jam_masuk_kantor . ' +40 minutes'));
       <div class="col-md-8">
         <form action="" method="GET">
           <div class="input-group">
-            <input type="date" class="form-control" name="tanggal_dari">
-            <input type="date" class="form-control mx-2" name="tanggal_sampai">
+            <input type="date" class="form-control" name="tanggal_dari" required>
+            <input type="date" class="form-control mx-2" name="tanggal_sampai" required>
             <button type="submit" class="btn btn-primary">Tampilkan</button>
             <a href="rekap_presensi.php" class="btn btn-success mx-2">Refresh</a>
           </div>
@@ -81,17 +74,14 @@ $jam_batas_telat = date('H:i:s', strtotime($jam_masuk_kantor . ' +40 minutes'));
             $jam_masuk_raw  = trim((string)($rekap['jam_masuk'] ?? ''));
             $jam_keluar_raw = trim((string)($rekap['jam_keluar'] ?? '00:00:00'));
             $tanggal_raw    = trim((string)($rekap['tanggal_masuk'] ?? ''));
+            $status_db      = $rekap['status']; // AMBIL STATUS DARI DB
 
-            // LOGIKA HITUNG TERLAMBAT
-            $jam_masuk_trainee = date('H:i:s', strtotime($jam_masuk_raw));
-            $is_telat = strtotime($jam_masuk_trainee) > strtotime($jam_batas_telat);
-            $diff_terlambat = strtotime($jam_masuk_trainee) - strtotime($jam_batas_telat);
-            $jam_telat = floor($diff_terlambat / 3600);
-            $menit_telat = floor(($diff_terlambat % 3600) / 60);
+            // LOGIKA TAMPILAN
+            $jam_pulang_display = "-";
+            $total_jam_display = "-";
+            $foto_keluar_display = "";
 
-            // PENENTUAN TAMPILAN (SINKRON DENGAN ADMIN)
             if ($jam_keluar_raw !== '00:00:00' && !empty($jam_keluar_raw)) {
-                // KONDISI SUDAH PRESENSI PULANG
                 $jam_pulang_display = $jam_keluar_raw;
                 
                 $ts_masuk = strtotime($tanggal_raw . ' ' . $jam_masuk_raw);
@@ -100,27 +90,14 @@ $jam_batas_telat = date('H:i:s', strtotime($jam_masuk_kantor . ' +40 minutes'));
                 $selisih = $ts_keluar - $ts_masuk;
                 $total_jam_display = floor($selisih / 3600) . " jam " . floor(($selisih % 3600) / 60) . " menit";
                 
-                $foto_keluar_display = '<img src="foto/'.$rekap['foto_keluar'].'" width="60" style="border-radius:5px;">';
-                
-                $status_badge = (!$is_telat) ? "<span class='badge bg-success text-white'>On Time</span>" : "<span class='badge bg-warning text-white'>Terlambat</span>";
-                $detail_telat = ($is_telat) ? "<br><small class='text-muted'>Telat: {$jam_telat}j {$menit_telat}m</small>" : "";
-
+                $foto_keluar_display = '<img src="foto/'.$rekap['foto_keluar'].'" width="60" style="border-radius:5px; height:60px; object-fit:cover;">';
             } else {
-                // KONDISI BELUM PRESENSI PULANG
                 if ($tanggal_raw < $hari_ini) {
-                    // JIKA SUDAH GANTI HARI -> ALPA
-                    $jam_pulang_display = "-";
                     $total_jam_display = "Tidak presensi pulang";
                     $foto_keluar_display = "<span class='text-danger' style='font-size:11px;'>Tidak presensi pulang</span>";
-                    $status_badge = "<span class='badge bg-danger text-white'>Alpa</span><br><small class='text-danger' style='font-size:10px;'>Tidak presensi pulang</small>";
-                    $detail_telat = "";
                 } else {
-                    // JIKA MASIH HARI INI -> SEDANG BEKERJA
-                    $jam_pulang_display = "";
                     $total_jam_display = "Sedang bekerja";
-                    $foto_keluar_display = "<small class='text-muted'>Belum melakukan presensi pulang</small>";
-                    $status_badge = (!$is_telat) ? "<span class='badge bg-success text-white'>On Time</span>" : "<span class='badge bg-warning text-white'>Terlambat</span>";
-                    $detail_telat = ($is_telat) ? "<br><small class='text-muted'>Telat: {$jam_telat}j {$menit_telat}m</small>" : "";
+                    $foto_keluar_display = "<small class='text-muted'>Belum presensi pulang</small>";
                 }
             }
           ?>
@@ -129,14 +106,26 @@ $jam_batas_telat = date('H:i:s', strtotime($jam_masuk_kantor . ' +40 minutes'));
               <td><?= date('d F Y', strtotime($rekap['tanggal_masuk'])); ?></td>
               <td><?= $jam_masuk_raw; ?></td>
               <td>
-                <img src="foto/<?= $rekap['foto_masuk']; ?>" width="60" style="border-radius:5px;">
+                <?php if(!empty($rekap['foto_masuk'])): ?>
+                  <img src="foto/<?= $rekap['foto_masuk']; ?>" width="60" style="border-radius:5px; height:60px; object-fit:cover;">
+                <?php else: echo "-"; endif; ?>
               </td>
-              <td><?= $jam_pulang_display; ?></td>
+              <td><?= ($jam_pulang_display == "00:00:00") ? "-" : $jam_pulang_display; ?></td>
               <td><?= $foto_keluar_display; ?></td>
               <td><?= $total_jam_display; ?></td>
               <td>
-                <?= $status_badge; ?>
-                <?= $detail_telat; ?>
+                <?php 
+                // BADGE SINKRON DENGAN DB
+                if ($status_db == 'Hadir' || $status_db == 'On Time') {
+                    echo "<span class='badge bg-success text-white'>On Time</span>";
+                } elseif ($status_db == 'Terlambat') {
+                    echo "<span class='badge bg-warning text-white'>Terlambat</span>";
+                } elseif ($status_db == 'Alpa') {
+                    echo "<span class='badge bg-danger text-white'>Alpa</span>";
+                } else {
+                    echo "<span class='badge bg-info text-white'>$status_db</span>";
+                }
+                ?>
               </td>
             </tr>
           <?php endwhile; ?>

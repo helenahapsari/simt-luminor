@@ -1,4 +1,4 @@
-<?php 
+<?php
 ob_start();
 session_start();
 
@@ -14,9 +14,9 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 
-// 1. AMBIL DATA POST (Disesuaikan dengan name="filter_bulan" di modal)
-$bulan = $_POST['filter_bulan'];
-$tahun = $_POST['filter_tahun'];
+// 1. AMBIL DATA POST
+$bulan = $_POST['filter_bulan'] ?? date('m');
+$tahun = $_POST['filter_tahun'] ?? date('Y');
 
 $nama_bulan_indo = [
     '01' => 'Januari', '02' => 'Februari', '03' => 'Maret', '04' => 'April',
@@ -25,9 +25,9 @@ $nama_bulan_indo = [
 ];
 $bulan_teks = $nama_bulan_indo[$bulan] ?? 'Bulan';
 
-// 2. Query Data
+// 2. Query Data - SEKARANG AMBIL KOLOM STATUS LANGSUNG DARI DB
 $result = mysqli_query($connection, "
-  SELECT presensi.*, trainee.nama, trainee.lokasi_presensi, trainee.nip 
+  SELECT presensi.*, trainee.nama, trainee.nip 
   FROM presensi 
   JOIN trainee ON trainee.id = presensi.id_trainee 
   WHERE MONTH(tanggal_masuk) = '$bulan' AND YEAR(tanggal_masuk) = '$tahun'
@@ -52,28 +52,16 @@ $row = 6;
 $hari_ini = date('Y-m-d');
 
 while($data = mysqli_fetch_array($result)){
-    $jam_masuk_raw  = trim((string)($data['jam_masuk'] ?? ''));
-    $jam_keluar_raw = trim((string)($data['jam_keluar'] ?? '00:00:00'));
-    $tanggal_raw    = trim((string)($data['tanggal_masuk'] ?? ''));
-
-    // Logika Lokasi & Toleransi
-    $lokasi_presensi = $data['lokasi_presensi'];
-    $lokasi_q = mysqli_query($connection, "SELECT jam_masuk FROM lokasi_presensi WHERE nama_lokasi = '$lokasi_presensi'");
-    $lokasi_res = mysqli_fetch_array($lokasi_q);
-    $jam_masuk_kantor = $lokasi_res['jam_masuk'];
-    $jam_batas_telat = date('H:i:s', strtotime($jam_masuk_kantor . ' +40 minutes'));
-
-    $jam_masuk_trainee = date('H:i:s', strtotime($jam_masuk_raw));
-    $is_telat = strtotime($jam_masuk_trainee) > strtotime($jam_batas_telat);
-    $diff_telat = strtotime($jam_masuk_trainee) - strtotime($jam_batas_telat);
-    $jam_t = floor($diff_telat / 3600);
-    $min_t = floor(($diff_telat % 3600) / 60);
+    $jam_masuk_raw  = $data['jam_masuk'] ?? '';
+    $jam_keluar_raw = $data['jam_keluar'] ?? '00:00:00';
+    $tanggal_raw    = $data['tanggal_masuk'] ?? '';
+    $status_db      = $data['status']; // INI JANGKAR KITA (SAMA DENGAN HOME)
 
     $val_jam_pulang = "-";
     $val_total_kerja = "";
-    $val_status = "";
     $val_ket_foto_k = "";
 
+    // Logika Total Jam Kerja
     if ($jam_keluar_raw !== '00:00:00' && !empty($jam_keluar_raw)) {
         $val_jam_pulang = $jam_keluar_raw;
         $ts_masuk = strtotime($tanggal_raw . ' ' . $jam_masuk_raw);
@@ -81,38 +69,48 @@ while($data = mysqli_fetch_array($result)){
         if ($ts_keluar < $ts_masuk) { $ts_keluar = strtotime('+1 day', $ts_keluar); }
         $selisih = $ts_keluar - $ts_masuk;
         $val_total_kerja = floor($selisih / 3600) . " jam " . floor(($selisih % 3600) / 60) . " menit";
-        $val_status = (!$is_telat) ? "On Time" : "Terlambat ({$jam_t}j {$min_t}m)";
     } else {
         if ($tanggal_raw < $hari_ini) {
             $val_total_kerja = "Tidak presensi pulang";
-            $val_status = "ALPA";
             $val_ket_foto_k = "Tidak presensi pulang";
         } else {
             $val_total_kerja = "Sedang bekerja";
-            $val_status = (!$is_telat) ? "On Time" : "Terlambat ({$jam_t}j {$min_t}m)";
-            $val_ket_foto_k = "Belum melakukan presensi pulang";
+            $val_ket_foto_k = "Belum presensi pulang";
         }
     }
 
+    // ISI DATA KE EXCEL
     $sheet->setCellValue('A'.$row, $no);
     $sheet->setCellValue('B'.$row, $data['nama']);
     $sheet->setCellValue('C'.$row, $data['nip']);
-    $sheet->setCellValue('D'.$row, $data['tanggal_masuk']);
-    $sheet->setCellValue('E'.$row, $data['jam_masuk']);
+    $sheet->setCellValue('D'.$row, $tanggal_raw);
+    $sheet->setCellValue('E'.$row, $jam_masuk_raw);
     $sheet->setCellValue('G'.$row, ($data['tanggal_keluar'] == '0000-00-00' ? '-' : $data['tanggal_keluar']));
     $sheet->setCellValue('H'.$row, $val_jam_pulang); 
     $sheet->setCellValue('J'.$row, $val_total_kerja); 
-    $sheet->setCellValue('K'.$row, $val_status); 
+    $sheet->setCellValue('K'.$row, $status_db); // STATUS DIAMBIL LANGSUNG DARI DB
 
+    // Foto Masuk
     if(!empty($data['foto_masuk']) && file_exists('../../trainee/presensi/foto/'.$data['foto_masuk'])){
-        $drawM = new Drawing(); $drawM->setPath('../../trainee/presensi/foto/'.$data['foto_masuk']);
-        $drawM->setCoordinates('F'.$row); $drawM->setHeight(50); $drawM->setWorksheet($sheet);
-    } else { $sheet->setCellValue('F'.$row, 'Tidak ada foto'); }
+        $drawM = new Drawing(); 
+        $drawM->setPath('../../trainee/presensi/foto/'.$data['foto_masuk']);
+        $drawM->setCoordinates('F'.$row); 
+        $drawM->setHeight(50); 
+        $drawM->setWorksheet($sheet);
+    } else { 
+        $sheet->setCellValue('F'.$row, 'Tidak ada foto'); 
+    }
 
+    // Foto Pulang
     if(!empty($data['foto_keluar']) && file_exists('../../trainee/presensi/foto/'.$data['foto_keluar'])){
-        $drawK = new Drawing(); $drawK->setPath('../../trainee/presensi/foto/'.$data['foto_keluar']);
-        $drawK->setCoordinates('I'.$row); $drawK->setHeight(50); $drawK->setWorksheet($sheet);
-    } else { $sheet->setCellValue('I'.$row, $val_ket_foto_k); }
+        $drawK = new Drawing(); 
+        $drawK->setPath('../../trainee/presensi/foto/'.$data['foto_keluar']);
+        $drawK->setCoordinates('I'.$row); 
+        $drawK->setHeight(50); 
+        $drawK->setWorksheet($sheet);
+    } else { 
+        $sheet->setCellValue('I'.$row, $val_ket_foto_k); 
+    }
 
     $sheet->getRowDimension($row)->setRowHeight(60);
     $no++; $row++;
@@ -120,7 +118,6 @@ while($data = mysqli_fetch_array($result)){
 
 foreach(range('A','K') as $col){ $sheet->getColumnDimension($col)->setAutoSize(true); }
 
-// Nama file menggunakan variabel $bulan_teks dan $tahun yang sudah ditangkap dengan benar
 $nama_file = "Rekap_Presensi_Bulanan_" . $bulan_teks . "_" . $tahun . ".xlsx";
 
 ob_end_clean();
