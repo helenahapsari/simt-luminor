@@ -52,8 +52,9 @@ $q_all = mysqli_query($connection, "SELECT COUNT(*) as total FROM users WHERE ro
 $total_trainee = (int)mysqli_fetch_assoc($q_all)['total']; // Hasil: 23
 
 // 2. Hitung yang Hadir (Tepat Waktu & Terlambat)
+// Hitung yang Hadir (Ganti 'Tepat Waktu' jadi 'On Time')
 $q_presensi = mysqli_query($connection, "SELECT 
-    COUNT(CASE WHEN status = 'Hadir' OR status = 'On Time' THEN 1 END) as tepat,
+    COUNT(CASE WHEN status = 'On Time' THEN 1 END) as tepat,
     COUNT(CASE WHEN status LIKE '%Terlambat%' THEN 1 END) as telat
     FROM presensi WHERE tanggal_masuk = '$filter_tanggal'");
 $d_presensi = mysqli_fetch_assoc($q_presensi);
@@ -69,17 +70,27 @@ $jml_izin = (int)(mysqli_fetch_assoc($q_sic)['jml'] ?? 0);
 $total_alpa_today = $total_trainee - ($jml_tepat + $jml_telat + $jml_izin);
 if ($total_alpa_today < 0) $total_alpa_today = 0;
 
+// --- TAMBAHAN OTOMATIS: AMBIL JAM DARI DATABASE ---
+$q_patokan = mysqli_query($connection, "SELECT jam_masuk FROM lokasi_presensi LIMIT 1");
+$d_patokan = mysqli_fetch_assoc($q_patokan);
+$jam_admin = $d_patokan['jam_masuk'] ?? '07:30:00';
+
+// Buat range 15 menitan otomatis untuk grafik
+$jam_1 = date('H:i:s', strtotime($jam_admin . ' + 15 minutes'));
+$jam_2 = date('H:i:s', strtotime($jam_admin . ' + 30 minutes'));
+$jam_3 = date('H:i:s', strtotime($jam_admin . ' + 45 minutes'));
+
 
 // Tambahkan baris ini SEBELUM query untuk memastikan format bulan selalu 2 digit (01, 02, dst)
 $m_safe = sprintf("%02d", $filter_bulan); 
 
+// Query Divisi (Samakan statusnya juga)
 $q_div = mysqli_query($connection, "SELECT nama_divisi, 
-    COUNT(CASE WHEN status = 'Tepat Waktu' THEN 1 END) as h_tepat,
+    COUNT(CASE WHEN status = 'On Time' THEN 1 END) as h_tepat,
     COUNT(CASE WHEN status LIKE '%Terlambat%' THEN 1 END) as h_telat
     FROM trainee 
     LEFT JOIN presensi ON trainee.id = presensi.id_trainee 
     AND tanggal_masuk = '$filter_tanggal'
-    -- FILTER UNTUK MENGHILANGKAN HRD MANAGER --
     WHERE nama_divisi != 'HRD Manager'
     GROUP BY nama_divisi");
 
@@ -143,25 +154,25 @@ $q_total = mysqli_query($connection, "SELECT COUNT(*) as total FROM users WHERE 
 $d_total = mysqli_fetch_assoc($q_total);
 $max_trainee = $d_total['total'];
 
+// Query Jam Masuk - Sekarang pakai variabel dinamis
 $q_jam = mysqli_query($connection, "SELECT 
-    COUNT(CASE WHEN jam_masuk BETWEEN '07:30:00' AND '07:45:59' THEN 1 END) as s1,
-    COUNT(CASE WHEN jam_masuk BETWEEN '07:46:00' AND '08:00:59' THEN 1 END) as s2,
-    COUNT(CASE WHEN jam_masuk BETWEEN '08:01:00' AND '08:15:59' THEN 1 END) as s3,
-    COUNT(CASE WHEN jam_masuk BETWEEN '08:16:00' AND '08:30:59' THEN 1 END) as s4,
-    COUNT(CASE WHEN jam_masuk > '08:30:59' THEN 1 END) as s5
+    COUNT(CASE WHEN jam_masuk <= '$jam_admin' THEN 1 END) as s1,
+    COUNT(CASE WHEN jam_masuk BETWEEN '$jam_admin' AND '$jam_1' THEN 1 END) as s2,
+    COUNT(CASE WHEN jam_masuk BETWEEN '$jam_1' AND '$jam_2' THEN 1 END) as s3,
+    COUNT(CASE WHEN jam_masuk BETWEEN '$jam_2' AND '$jam_3' THEN 1 END) as s4,
+    COUNT(CASE WHEN jam_masuk > '$jam_3' THEN 1 END) as s5
     FROM presensi WHERE tanggal_masuk = '$filter_tanggal'");
 $d_jam = mysqli_fetch_assoc($q_jam);
 
+// Query Bulanan - Ganti 'Hadir' jadi 'On Time' agar sinkron!
 $q_bulanan = mysqli_query($connection, "SELECT 
-    COUNT(CASE WHEN status = 'Hadir' THEN 1 END) as tepat, 
+    COUNT(CASE WHEN status = 'On Time' THEN 1 END) as tepat, 
     COUNT(CASE WHEN status LIKE '%Terlambat%' THEN 1 END) as telat
     FROM presensi
     WHERE MONTH(tanggal_masuk) = '$filter_bulan'
     AND YEAR(tanggal_masuk) = '$filter_tahun'");
-
 $d_bulanan = mysqli_fetch_assoc($q_bulanan);
 
-// Ambil angka aslinya saja, jangan dipersentasekan di PHP
 $tepat = (int)$d_bulanan['tepat'];
 $telat = (int)$d_bulanan['telat'];
 
@@ -282,7 +293,8 @@ new Chart(document.getElementById('chartSnapshot'), {
     plugins: [ChartDataLabels],
     data: {
         // Tambahkan label Sakit/Izin di sini
-        labels: ['Tepat Waktu', 'Terlambat', 'Sakit/Izin', 'Alpa'],
+        // Ganti 'Tepat Waktu' jadi 'On Time' agar sama dengan data database lo
+        labels: ['On Time', 'Terlambat', 'Sakit/Izin', 'Alpa'],
         datasets: [{
             data: [
                 <?= $jml_tepat ?>, 
