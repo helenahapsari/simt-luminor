@@ -89,29 +89,17 @@ if(empty($_GET['tanggal_dari'])){
         $jam_keluar_raw = trim((string)($rekap['jam_keluar'] ?? ''));
         $tanggal_raw    = trim((string)($rekap['tanggal_masuk'] ?? ''));
         $hari_ini       = date('Y-m-d');
-
-        // 2. Aturan Jam Masuk & Toleransi 40 Menit
-        $lokasi_presensi = $rekap['lokasi_presensi'];
-        $lokasi = mysqli_query($connection, "SELECT jam_masuk FROM lokasi_presensi WHERE nama_lokasi = '$lokasi_presensi'");
-        $lokasi_result = mysqli_fetch_array($lokasi);
-        $jam_masuk_kantor = $lokasi_result['jam_masuk'];
-        $jam_batas_telat = date('H:i:s', strtotime($jam_masuk_kantor . ' +40 minutes'));
-
-        // 3. Hitung Keterlambatan
-        $jam_masuk_trainee = date('H:i:s', strtotime($jam_masuk_raw));
-        $is_telat = strtotime($jam_masuk_trainee) > strtotime($jam_batas_telat);
         
-        $diff_terlambat = strtotime($jam_masuk_trainee) - strtotime($jam_batas_telat);
-        $jam_telat = floor($diff_terlambat / 3600);
-        $menit_telat = floor(($diff_terlambat % 3600) / 60);
+        // 2. AMBIL STATUS DARI DATABASE (TIDAK NGITUNG ULANG LAGI)
+        $status_database = $rekap['status_disiplin']; 
 
-        // 4. Inisialisasi Variabel Tampilan
+        // 3. Inisialisasi Variabel Tampilan
         $jam_pulang_display = "";
         $foto_keluar_display = "";
         $total_jam_display = "";
         $status_final_badge = "";
 
-        // --- LOGIKA FINAL STATUS & BADGE (TEXT WHITE) ---
+        // --- LOGIKA TAMPILAN (HANYA UNTUK BADGE WARNA) ---
         if ($jam_keluar_raw !== '00:00:00' && !empty($jam_keluar_raw)) {
             // KONDISI: SUDAH PULANG
             $jam_pulang_display = $jam_keluar_raw;
@@ -123,29 +111,27 @@ if(empty($_GET['tanggal_dari'])){
             $selisih = $ts_keluar - $ts_masuk;
             $total_jam_display = floor($selisih / 3600) . " jam " . floor(($selisih % 3600) / 60) . " menit";
 
-            if (!$is_telat) {
-                $status_final_badge = "<span class='badge bg-success text-white'>On Time</span>";
+            if ($status_database == 'Tepat Waktu') {
+                $status_final_badge = "<span class='badge bg-success text-white'>Tepat Waktu</span>";
             } else {
-                $status_final_badge = "<span class='badge bg-warning text-white'>Terlambat</span><br><small class='text-muted'>Telat: {$jam_telat}j {$menit_telat}m</small>";
+                $status_final_badge = "<span class='badge bg-warning text-white'>Terlambat</span>";
             }
         } else {
             // KONDISI: BELUM PULANG
             if ($tanggal_raw < $hari_ini) {
-                // Vonis Alpa (Lewat hari)
                 $jam_pulang_display = "-";
                 $status_final_badge = "<span class='badge bg-danger text-white'>Alpa</span><br><small class='text-danger' style='font-size:10px;'>Tidak presensi pulang</small>";
                 $foto_keluar_display = "<span class='text-muted' style='font-size:11px;'>Tidak presensi pulang.</span>";
                 $total_jam_display = "<span class='text-muted' style='font-size:11px;'>Tidak presensi pulang</span>";
             } else {
-                // Sedang Bekerja (Hari ini)
                 $jam_pulang_display = ""; 
-                $foto_keluar_display = "<span class='text-muted' style='font-size:11px;'>Belum melakukan presesi pulang.</span>";
+                $foto_keluar_display = "<span class='text-muted' style='font-size:11px;'>Belum pulang.</span>";
                 $total_jam_display = "Sedang bekerja";
                 
-                if (!$is_telat) {
-                    $status_final_badge = "<span class='badge bg-success text-white'>On Time</span>";
+                if ($status_database == 'Tepat Waktu') {
+                    $status_final_badge = "<span class='badge bg-success text-white'>Tepat Waktu</span>";
                 } else {
-                    $status_final_badge = "<span class='badge bg-warning text-white'>Terlambat</span><br><small class='text-muted'>Telat: {$jam_telat}j {$menit_telat}m</small>";
+                    $status_final_badge = "<span class='badge bg-warning text-white'>Terlambat</span>";
                 }
             }
         }
