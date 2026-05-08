@@ -164,7 +164,6 @@ while ($row = mysqli_fetch_assoc($q_div)) {
 
     $jam_masuk = $row['jam_masuk'];
     $jam_keluar = $row['jam_keluar'];
-    $tanggal = $row['tanggal_masuk'];
     $jam_kantor = $row['jam_kantor'];
 
     if (!empty($jam_masuk)) {
@@ -172,18 +171,19 @@ while ($row = mysqli_fetch_assoc($q_div)) {
         $batas_telat = date('H:i:s', strtotime($jam_kantor . ' +40 minutes'));
         $is_telat = strtotime($jam_masuk) > strtotime($batas_telat);
 
-        // 🔥 RULE FINAL (SAMA KAYAK REKAP)
         if (!empty($jam_keluar) && $jam_keluar != '00:00:00') {
+
             if ($is_telat) {
                 $divisi_data[$div]['telat']++;
             } else {
                 $divisi_data[$div]['tepat']++;
             }
+
         }
     }
 }
 
-// Convert ke array chart
+// convert ke chart
 $labels_div = [];
 $data_tepat_div = [];
 $data_telat_div = [];
