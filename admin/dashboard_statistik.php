@@ -2,15 +2,6 @@
 session_start();
 ob_start();
 require_once('../config.php'); // Path ke config lo
-
-// TARUH DI PALING ATAS
-$cek_data = mysqli_query($connection, "SELECT DISTINCT status FROM presensi");
-echo "<h3>Daftar Status di Database:</h3>";
-while($row = mysqli_fetch_assoc($cek_data)) {
-    echo "'<pre>[" . $row['status'] . "]</pre>' <br>";
-}
-die(); // Biar halaman berhenti di sini dulu buat kita cek
-
 include('layout/header.php'); // Path ke header admin
 ?>
 
