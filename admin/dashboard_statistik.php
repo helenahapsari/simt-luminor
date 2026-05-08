@@ -135,6 +135,7 @@ while ($t = mysqli_fetch_assoc($q_all_trainee)) {
 $m_safe = sprintf("%02d", $filter_bulan); 
 
 // --- 2. DATA PER DIVISI (UNTUK CHART KIRI & KANAN) ---
+// --- 2. DATA PER DIVISI (UNTUK CHART KANAN BAR & KIRI PIE) ---
 $q_div = mysqli_query($connection, "
 SELECT 
     t.nama_divisi,
@@ -144,19 +145,18 @@ FROM trainee t
 LEFT JOIN presensi p ON t.id = p.id_trainee 
     AND DATE(p.tanggal_masuk) = '$filter_tanggal'
 LEFT JOIN lokasi_presensi l ON l.nama_lokasi = t.lokasi_presensi
-WHERE t.nama_divisi != 'HRD Manager' 
-AND t.status = 'Aktif'
-");
+WHERE t.nama_divisi != 'HRD Manager'
+"); // Kolom t.status dihapus karena bikin error di DB lo
 
 $divisi_data = [];
 while ($row = mysqli_fetch_assoc($q_div)) {
     $div = $row['nama_divisi'];
     
-    // Inisialisasi awal biar divisi yang belum absen tetep ada (tapi 0)
     if (!isset($divisi_data[$div])) {
         $divisi_data[$div] = ['tepat' => 0, 'telat' => 0];
     }
 
+    // CUKUP CEK jam_masuk (Gak perlu nunggu jam_keluar biar chart isi dari pagi)
     if (!empty($row['jam_masuk'])) {
         $batas_telat = date('H:i:s', strtotime($row['jam_kantor'] . ' +40 minutes'));
         $is_telat = strtotime($row['jam_masuk']) > strtotime($batas_telat);
@@ -169,15 +169,14 @@ while ($row = mysqli_fetch_assoc($q_div)) {
     }
 }
 
-// Convert data ke format yang dimengerti Chart.js
+// Convert ke format Chart.js
 $labels_div = [];
 $data_tepat_div = [];
 $data_telat_div = [];
 $data_total_div = [];
 
 foreach ($divisi_data as $div => $val) {
-    // Hanya masukkan ke array jika ada aktivitas (tepat/telat > 0) 
-    // biar chart gak penuh sama divisi kosong
+    // Hanya munculin divisi yang SUDAH ada aktivitas hadir/telat
     if ($val['tepat'] > 0 || $val['telat'] > 0) {
         $labels_div[] = $div;
         $data_tepat_div[] = (int)$val['tepat'];
