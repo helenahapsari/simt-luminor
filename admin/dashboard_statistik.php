@@ -69,6 +69,8 @@ $alpa_masuk = 0;
 $hari_ini = date('Y-m-d');
 
 while ($row = mysqli_fetch_assoc($q_all)) {
+    
+    echo $row['jam_masuk'] . "<br>";
 
     $jam_masuk = $row['jam_masuk'];
     $jam_keluar = $row['jam_keluar'];
