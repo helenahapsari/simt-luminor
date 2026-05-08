@@ -47,9 +47,14 @@ $filter_tanggal = $_GET['tanggal'] ?? date('Y-m-d');
 $filter_bulan = date('m', strtotime($filter_tanggal));
 $filter_tahun = date('Y', strtotime($filter_tanggal));
 
-// --- 1. DATA SNAPSHOT HARI INI (FIX SESUAI REKAP) ---
+// --- 1. DATA SNAPSHOT HARI INI (FIX TOTAL FINAL) ---
 
-// Ambil semua data presensi + jam kantor
+$tepat = 0;
+$telat = 0;
+$izin = 0;
+$hadir_ids = [];
+
+// Ambil semua presensi hari ini
 $q_all = mysqli_query($connection, "
 SELECT 
     p.*, 
@@ -63,41 +68,17 @@ WHERE DATE(p.tanggal_masuk) = '$filter_tanggal'
 
 while ($row = mysqli_fetch_assoc($q_all)) {
 
+    $id_trainee = $row['id_trainee'];
     $jam_masuk = $row['jam_masuk'];
     $jam_kantor = $row['jam_kantor'];
 
-    $batas_telat = date('H:i:s', strtotime("+40 minutes", strtotime($jam_kantor)));
-    $is_telat = strtotime($jam_masuk) > strtotime($batas_telat);
+    // Tandain dia hadir
+    $hadir_ids[] = $id_trainee;
 
-    // DEBUG DI SINI
-    echo "<pre>";
-    echo "Jam Masuk: " . $jam_masuk . "\n";
-    echo "Jam Kantor: " . $jam_kantor . "\n";
-    echo "Batas Telat: " . $batas_telat . "\n";
-    echo "Is Telat: " . ($is_telat ? 'YA' : 'TIDAK') . "\n";
-    echo "----------------------\n";
-    echo "</pre>";
+    if (!empty($jam_masuk)) {
 
-}
-
-// Inisialisasi
-$tepat = 0;
-$telat = 0;
-$alpa_masuk = 0;
-
-$hari_ini = date('Y-m-d');
-    echo $row['jam_masuk'] . " | " . $row['jam_kantor'] . "<br>";
-
-    $jam_masuk = $row['jam_masuk'];
-    $jam_keluar = $row['jam_keluar'];
-    $tanggal = $row['tanggal_masuk'];
-    $jam_kantor = $row['jam_kantor'];
-
-    $batas_telat = date('H:i:s', strtotime($jam_kantor . ' +40 minutes'));
-    $is_telat = strtotime($jam_masuk) > strtotime($batas_telat);
-
-    // LOGIC SESUAI REKAP
-    if (!is_null($jam_keluar) && $jam_keluar != '00:00:00') {
+        $batas_telat = date('H:i:s', strtotime("+40 minutes", strtotime($jam_kantor)));
+        $is_telat = strtotime($jam_masuk) > strtotime($batas_telat);
 
         if ($is_telat) {
             $telat++;
@@ -105,28 +86,40 @@ $hari_ini = date('Y-m-d');
             $tepat++;
         }
 
-    } else {
-        if ($tanggal < $hari_ini) {
-            $alpa_masuk++;
-        }
     }
+}
 
-// HITUNG IZIN
+// Ambil IZIN / SAKIT (yang APPROVE)
 $q_izin = mysqli_query($connection, "
-SELECT COUNT(DISTINCT id_trainee) as total
+SELECT DISTINCT id_trainee
 FROM ketidakhadiran
 WHERE status_pengajuan = 'Approve'
 AND DATE(tanggal) = '$filter_tanggal'
 ");
 
-$izin = mysqli_fetch_assoc($q_izin)['total'];
+$izin_ids = [];
+while ($row = mysqli_fetch_assoc($q_izin)) {
+    $izin_ids[] = $row['id_trainee'];
+}
 
-// TOTAL TRAINEE
+$izin = count($izin_ids);
+
+// Total trainee
 $q_total = mysqli_query($connection, "SELECT COUNT(*) as total FROM trainee");
 $total_trainee = mysqli_fetch_assoc($q_total)['total'];
 
-// HITUNG ALPA FINAL
-$alpa = $total_trainee - ($tepat + $telat + $izin);
+// HITUNG ALPA (FINAL PALING AMAN)
+$alpa = 0;
+
+$q_all_trainee = mysqli_query($connection, "SELECT id FROM trainee");
+
+while ($t = mysqli_fetch_assoc($q_all_trainee)) {
+    $id = $t['id'];
+
+    if (!in_array($id, $hadir_ids) && !in_array($id, $izin_ids)) {
+        $alpa++;
+    }
+}
 
 // Tambahkan baris ini SEBELUM query untuk memastikan format bulan selalu 2 digit (01, 02, dst)
 $m_safe = sprintf("%02d", $filter_bulan); 
