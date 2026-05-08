@@ -322,7 +322,7 @@ const yAxisConfig = {
 // 1. Snapshot (Doughnut) -- Pakai (Hari Ini)
 new Chart(document.getElementById('chartSnapshot'), {
     type: 'doughnut',
-    plugins: [ChartDataLabels], // DAFTARKAN DI SINI SAJA
+    plugins: [ChartDataLabels],
     data: {
         labels: ['Tepat Waktu', 'Terlambat', 'Izin/Sakit', 'Alpa'],
         datasets: [{
@@ -332,7 +332,12 @@ new Chart(document.getElementById('chartSnapshot'), {
                 <?= $izin ?>,
                 <?= $alpa ?>
             ],
-            backgroundColor: ['#2fb344', '#f59f00', '#d63939']
+            backgroundColor: [
+                '#2fb344',
+                '#f59f00',
+                '#467fcf',
+                '#d63939'
+            ]
         }]
     },
     options: {
