@@ -47,18 +47,71 @@ $filter_tanggal = $_GET['tanggal'] ?? date('Y-m-d');
 $filter_bulan = date('m', strtotime($filter_tanggal));
 $filter_tahun = date('Y', strtotime($filter_tanggal));
 
-// --- 1. DATA SNAPSHOT HARI INI (DOUGHNUT) ---
-// Logika Alpa: Total Trainee - Total Hadir hari ini
-$q_all = mysqli_query($connection, "SELECT COUNT(*) as total FROM trainee");
-$total_trainee = mysqli_fetch_assoc($q_all)['total'];
+// --- 1. DATA SNAPSHOT HARI INI (FIX SESUAI REKAP) ---
 
-$q_presensi = mysqli_query($connection, "SELECT 
-    COUNT(CASE WHEN status = 'Tepat Waktu' THEN 1 END) as tepat,
-    COUNT(CASE WHEN status LIKE '%Terlambat%' THEN 1 END) as telat
-    FROM presensi WHERE tanggal_masuk = '$filter_tanggal'");
-$d_presensi = mysqli_fetch_assoc($q_presensi);
-$total_hadir_today = $d_presensi['tepat'] + $d_presensi['telat'];
-$total_alpa_today = $total_trainee - $total_hadir_today;
+// Ambil semua data presensi + jam kantor
+$q_all = mysqli_query($connection, "
+SELECT 
+    p.*, 
+    t.lokasi_presensi,
+    l.jam_masuk as jam_kantor
+FROM presensi p
+JOIN trainee t ON t.id = p.id_trainee
+JOIN lokasi_presensi l ON l.nama_lokasi = t.lokasi_presensi
+WHERE DATE(p.tanggal_masuk) = '$filter_tanggal'
+");
+
+// Inisialisasi
+$tepat = 0;
+$telat = 0;
+$alpa_masuk = 0;
+
+$hari_ini = date('Y-m-d');
+
+while ($row = mysqli_fetch_assoc($q_all)) {
+
+    $jam_masuk = $row['jam_masuk'];
+    $jam_keluar = $row['jam_keluar'];
+    $tanggal = $row['tanggal_masuk'];
+    $jam_kantor = $row['jam_kantor'];
+
+    $batas_telat = date('H:i:s', strtotime($jam_kantor . ' +40 minutes'));
+    $is_telat = strtotime($jam_masuk) > strtotime($batas_telat);
+
+    // LOGIC SESUAI REKAP
+    if (!empty($jam_keluar) && $jam_keluar != '00:00:00') {
+
+        if ($is_telat) {
+            $telat++;
+        } else {
+            $tepat++;
+        }
+
+    } else {
+        if ($tanggal < $hari_ini) {
+            $alpa_masuk++;
+        }
+    }
+}
+
+// HITUNG IZIN
+$q_izin = mysqli_query($connection, "
+SELECT COUNT(DISTINCT id_trainee) as total
+FROM ketidakhadiran
+WHERE status_pengajuan = 'Approve'
+AND DATE(tanggal) = '$filter_tanggal'
+");
+
+$izin = mysqli_fetch_assoc($q_izin)['total'];
+
+// TOTAL TRAINEE
+$q_total = mysqli_query($connection, "SELECT COUNT(*) as total FROM trainee");
+$total_trainee = mysqli_fetch_assoc($q_total)['total'];
+
+// HITUNG ALPA FINAL
+$alpa = $total_trainee - ($tepat + $telat + $izin);
+$alpa += $alpa_masuk;
+
 
 // Tambahkan baris ini SEBELUM query untuk memastikan format bulan selalu 2 digit (01, 02, dst)
 $m_safe = sprintf("%02d", $filter_bulan); 
@@ -271,12 +324,13 @@ new Chart(document.getElementById('chartSnapshot'), {
     type: 'doughnut',
     plugins: [ChartDataLabels], // DAFTARKAN DI SINI SAJA
     data: {
-        labels: ['Tepat Waktu', 'Terlambat', 'Alpa'],
+        labels: ['Tepat Waktu', 'Terlambat', 'Izin/Sakit', 'Alpa'],
         datasets: [{
             data: [
-                <?= (int)($d_presensi['tepat'] ?? 0) ?>, 
-                <?= (int)($d_presensi['telat'] ?? 0) ?>, 
-                <?= (int)($total_alpa_today ?? 0) ?>
+                <?= $tepat ?>,
+                <?= $telat ?>,
+                <?= $izin ?>,
+                <?= $alpa ?>
             ],
             backgroundColor: ['#2fb344', '#f59f00', '#d63939']
         }]
