@@ -135,10 +135,13 @@ while ($t = mysqli_fetch_assoc($q_all_trainee)) {
 $m_safe = sprintf("%02d", $filter_bulan); 
 
 // --- 2. DATA PER DIVISI (UNTUK CHART KIRI & KANAN) ---
+// --- 2. DATA PER DIVISI (FIX SINKRON: TOTAL 3) ---
 $q_div = mysqli_query($connection, "
 SELECT 
     t.nama_divisi,
     p.jam_masuk,
+    p.jam_keluar,
+    p.tanggal_masuk,
     l.jam_masuk as jam_kantor
 FROM trainee t
 LEFT JOIN presensi p ON t.id = p.id_trainee 
@@ -148,6 +151,8 @@ WHERE t.nama_divisi != 'HRD Manager'
 ");
 
 $divisi_data = [];
+$hari_ini = date('Y-m-d');
+
 while ($row = mysqli_fetch_assoc($q_div)) {
     $div = $row['nama_divisi'];
 
@@ -156,10 +161,19 @@ while ($row = mysqli_fetch_assoc($q_div)) {
     }
 
     $jam_masuk = $row['jam_masuk'];
+    $jam_keluar = $row['jam_keluar'];
+    $tanggal = $row['tanggal_masuk'];
     $jam_kantor = $row['jam_kantor'];
 
-    // LOGIKA FIX: Cukup cek jam_masuk. Begitu absen masuk, langsung masuk chart!
+    // LOGIKA SINKRON: Cek jam masuk dulu
     if (!empty($jam_masuk)) {
+        
+        // CEK ALPA: Kalau tanggalnya sudah lewat dan gak ada jam keluar, JANGAN DIHITUNG
+        if ($tanggal < $hari_ini && (empty($jam_keluar) || $jam_keluar == '00:00:00')) {
+            continue; 
+        }
+
+        // Hitung status Tepat/Telat
         $batas_telat = date('H:i:s', strtotime($jam_kantor . ' +40 minutes'));
         $is_telat = strtotime($jam_masuk) > strtotime($batas_telat);
 
@@ -171,19 +185,17 @@ while ($row = mysqli_fetch_assoc($q_div)) {
     }
 }
 
-// Convert ke format Chart.js (Visual tetap sama seperti yang lo minta)
 // --- Convert ke format Chart.js ---
 $labels_div = [];
 $data_tepat_div = [];
 $data_telat_div = [];
 $data_total_div = [];
 
-// Looping semua hasil dari kueri awal (agar semua divisi tetap muncul di sumbu X)
 foreach ($divisi_data as $div => $val) {
-    $labels_div[] = $div; // Nama divisi (Accounting, Sales, dll) tetap masuk
-    $data_tepat_div[] = (int)$val['tepat']; // Isi 0 kalau belum ada data
-    $data_telat_div[] = (int)$val['telat']; // Isi 0 kalau belum ada data
-    $data_total_div[] = (int)($val['tepat'] + $val['telat']);
+    $labels_div[] = $div;
+    $data_tepat_div[] = (int)$val['tepat'];
+    $data_telat_div[] = (int)$val['telat'];
+    $data_total_div[] = (int)($val['tepat'] + $val['telat']); // Ini yang bikin Pie Chart jadi 3
 }
 
 // --- 4. TOP 5 TRAINEE PALING RAJIN (DENGAN LOGIKA DISIPLIN) ---
