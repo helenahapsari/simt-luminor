@@ -134,12 +134,11 @@ while ($t = mysqli_fetch_assoc($q_all_trainee)) {
 // Tambahkan baris ini SEBELUM query untuk memastikan format bulan selalu 2 digit (01, 02, dst)
 $m_safe = sprintf("%02d", $filter_bulan); 
 
+// --- 2. DATA PER DIVISI (UNTUK CHART KIRI & KANAN) ---
 $q_div = mysqli_query($connection, "
 SELECT 
     t.nama_divisi,
     p.jam_masuk,
-    p.jam_keluar,
-    p.tanggal_masuk,
     l.jam_masuk as jam_kantor
 FROM trainee t
 LEFT JOIN presensi p ON t.id = p.id_trainee 
@@ -148,52 +147,44 @@ LEFT JOIN lokasi_presensi l ON l.nama_lokasi = t.lokasi_presensi
 WHERE t.nama_divisi != 'HRD Manager'
 ");
 
-$labels_div = []; $data_tepat_div = []; $data_telat_div = []; $data_total_div = [];
 $divisi_data = [];
-
 while ($row = mysqli_fetch_assoc($q_div)) {
-
     $div = $row['nama_divisi'];
 
     if (!isset($divisi_data[$div])) {
-        $divisi_data[$div] = [
-            'tepat' => 0,
-            'telat' => 0
-        ];
+        $divisi_data[$div] = ['tepat' => 0, 'telat' => 0];
     }
 
     $jam_masuk = $row['jam_masuk'];
-    $jam_keluar = $row['jam_keluar'];
     $jam_kantor = $row['jam_kantor'];
 
+    // LOGIKA FIX: Cukup cek jam_masuk. Begitu absen masuk, langsung masuk chart!
     if (!empty($jam_masuk)) {
-
         $batas_telat = date('H:i:s', strtotime($jam_kantor . ' +40 minutes'));
         $is_telat = strtotime($jam_masuk) > strtotime($batas_telat);
 
-        if (!empty($jam_keluar) && $jam_keluar != '00:00:00') {
-
-            if ($is_telat) {
-                $divisi_data[$div]['telat']++;
-            } else {
-                $divisi_data[$div]['tepat']++;
-            }
-
+        if ($is_telat) {
+            $divisi_data[$div]['telat']++;
+        } else {
+            $divisi_data[$div]['tepat']++;
         }
     }
 }
 
-// convert ke chart
+// Convert ke format Chart.js (Visual tetap sama seperti yang lo minta)
 $labels_div = [];
 $data_tepat_div = [];
 $data_telat_div = [];
 $data_total_div = [];
 
 foreach ($divisi_data as $div => $val) {
-    $labels_div[] = $div;
-    $data_tepat_div[] = $val['tepat'];
-    $data_telat_div[] = $val['telat'];
-    $data_total_div[] = $val['tepat'] + $val['telat'];
+    // Hanya masukkan ke array jika ada yang hadir (biar chart nggak penuh batang kosong)
+    if ($val['tepat'] > 0 || $val['telat'] > 0) {
+        $labels_div[] = $div;
+        $data_tepat_div[] = (int)$val['tepat'];
+        $data_telat_div[] = (int)$val['telat'];
+        $data_total_div[] = (int)($val['tepat'] + $val['telat']);
+    }
 }
 
 // --- 4. TOP 5 TRAINEE PALING RAJIN (DENGAN LOGIKA DISIPLIN) ---
