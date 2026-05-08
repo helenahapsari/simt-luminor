@@ -261,18 +261,36 @@ $d_jam = mysqli_fetch_assoc($q_jam);
 
 // ASLINYA: status = 'Hadir' (INI SALAH, GANTI JADI 'On Time')
 // --- 8. DATA BULANAN (REPLACE BAGIAN INI) ---
-$q_bulanan_fix = mysqli_query($connection, "SELECT  
-    COUNT(CASE WHEN status = 'Hadir' THEN 1 END) as total_hadir_fix,  
-    COUNT(CASE WHEN status LIKE '%Terlambat%' THEN 1 END) as total_telat_fix
-    FROM presensi
-    WHERE MONTH(tanggal_masuk) = '$filter_bulan'
-    AND YEAR(tanggal_masuk) = '$filter_tahun'");
+// --- 8. DATA BULANAN (SINKRON DENGAN SETTINGAN LOKASI & ANTI-ALPA) ---
+$q_bulanan_fix = mysqli_query($connection, "
+SELECT 
+    p.jam_masuk, 
+    p.jam_keluar, 
+    l.jam_masuk as jam_kantor
+FROM presensi p
+JOIN trainee t ON t.id = p.id_trainee
+JOIN lokasi_presensi l ON l.nama_lokasi = t.lokasi_presensi
+WHERE MONTH(p.tanggal_masuk) = '$filter_bulan'
+AND YEAR(p.tanggal_masuk) = '$filter_tahun'
+AND (p.jam_keluar IS NOT NULL AND p.jam_keluar != '00:00:00')
+");
 
-$d_bulanan_ok = mysqli_fetch_assoc($q_bulanan_fix);
+$tepat_bulan_final = 0;
+$telat_bulan_final = 0;
 
-// KITA PAKE NAMA BARU BIAR GAK TABRAKAN SAMA VARIABEL DI ATAS
-$tepat_bulan_final = (int)$d_bulanan_ok['total_hadir_fix'];
-$telat_bulan_final = (int)$d_bulanan_ok['total_telat_fix'];
+while ($row = mysqli_fetch_assoc($q_bulanan_fix)) {
+    $j_masuk = $row['jam_masuk'];
+    $j_kantor = $row['jam_kantor'];
+    
+    // Pakai toleransi 40 menit sesuai aturan dashboard lo
+    $batas_telat = date('H:i:s', strtotime($j_kantor . ' +40 minutes'));
+    
+    if (strtotime($j_masuk) <= strtotime($batas_telat)) {
+        $tepat_bulan_final++;
+    } else {
+        $telat_bulan_final++;
+    }
+}
 
 ?>
 
