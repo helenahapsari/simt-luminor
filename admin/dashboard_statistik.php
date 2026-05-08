@@ -70,11 +70,21 @@ while ($row = mysqli_fetch_assoc($q_all)) {
 
     $id_trainee = $row['id_trainee'];
     $jam_masuk = $row['jam_masuk'];
+    $jam_keluar = $row['jam_keluar'];
+    $tanggal = $row['tanggal_masuk'];
     $jam_kantor = $row['jam_kantor'];
 
-    // Tandain dia hadir
+    $hari_ini = date('Y-m-d');
+
+    // Tandain dia pernah presensi
     $hadir_ids[] = $id_trainee;
 
+    // CEK: kalau sudah lewat hari dan tidak presensi pulang → ALPA
+    if ($tanggal < $hari_ini && (empty($jam_keluar) || $jam_keluar == '00:00:00')) {
+        continue; // SKIP → nanti dihitung sebagai alpa
+    }
+
+    // Kalau ada jam masuk → hitung hadir
     if (!empty($jam_masuk)) {
 
         $batas_telat = date('H:i:s', strtotime("+40 minutes", strtotime($jam_kantor)));
