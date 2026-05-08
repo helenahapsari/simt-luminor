@@ -205,17 +205,17 @@ $d_jam = mysqli_fetch_assoc($q_jam);
 
 // ASLINYA: status = 'Hadir' (INI SALAH, GANTI JADI 'On Time')
 $q_bulanan = mysqli_query($connection, "SELECT  
-    COUNT(CASE WHEN status = 'On Time' THEN 1 END) as total_tepat,  
-    COUNT(CASE WHEN TRIM(status) = 'On Time' THEN 1 END) as total_tepat_fix,
+    -- Hanya hitung yang statusnya BENER-BENER tulisan 'Hadir' saja
+    COUNT(CASE WHEN status = 'Hadir' THEN 1 END) as total_tepat,  
+    
+    -- Hanya hitung yang statusnya ada kata 'Terlambat'
     COUNT(CASE WHEN status LIKE '%Terlambat%' THEN 1 END) as total_telat
     FROM presensi
     WHERE MONTH(tanggal_masuk) = '$filter_bulan'
     AND YEAR(tanggal_masuk) = '$filter_tahun'");
 
 $d_bulanan_fix = mysqli_fetch_assoc($q_bulanan);
-
-// Gunakan 'total_tepat_fix' biar kalau ada spasi gak sengaja di database tetep kehitung
-$tepat_bulanan = (int)$d_bulanan_fix['total_tepat_fix']; 
+$tepat_bulanan = (int)$d_bulanan_fix['total_tepat'];
 $telat_bulanan = (int)$d_bulanan_fix['total_telat'];
 
 ?>
