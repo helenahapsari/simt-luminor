@@ -195,16 +195,19 @@ $q_jam = mysqli_query($connection, "SELECT
 $d_jam = mysqli_fetch_assoc($q_jam);
 
 // ASLINYA: status = 'Hadir' (INI SALAH, GANTI JADI 'On Time')
-$q_bulanan = mysqli_query($connection, "SELECT 
-    COUNT(CASE WHEN status = 'On Time' THEN 1 END) as tepat, 
-    COUNT(CASE WHEN status LIKE '%Terlambat%' THEN 1 END) as telat
+$q_bulanan = mysqli_query($connection, "SELECT  
+    COUNT(CASE WHEN status = 'On Time' THEN 1 END) as total_tepat,  
+    COUNT(CASE WHEN status LIKE '%Terlambat%' THEN 1 END) as total_telat
     FROM presensi
     WHERE MONTH(tanggal_masuk) = '$filter_bulan'
     AND YEAR(tanggal_masuk) = '$filter_tahun'");
 
-// Ambil angka aslinya
-$tepat = (int)$d_bulanan['tepat'];
-$telat = (int)$d_bulanan['telat'];
+// KITA TARIK DATANYA BIAR VARIABELNYA ADA ISINYA
+$d_bulanan_fix = mysqli_fetch_assoc($q_bulanan);
+
+// KITA KASIH NAMA BARU BIAR GAK TABRAKAN SAMA DATA HARIAN
+$tepat_bulanan = (int)$d_bulanan_fix['total_tepat'];
+$telat_bulanan = (int)$d_bulanan_fix['total_telat'];
 
 ?>
 
@@ -543,16 +546,16 @@ new Chart(document.getElementById('chartJam'), {
 });
 
 new Chart(document.getElementById('chartDisiplin'), {
-    type: 'doughnut',
-    plugins: [ChartDataLabels],
+    // ... kode lain ...
     data: {
         labels: ['Tepat Waktu', 'Terlambat'],
         datasets: [{
-            // PAKAI ANGKA ASLI (JUMLAH ORANG), BUKAN HASIL PERSEN DARI PHP
-            data: [<?= $tepat ?>, <?= $telat ?>], 
+            // PAKAI VARIABEL BARU YANG TADI KITA BUAT DI ATAS
+            data: [<?= $tepat_bulanan ?>, <?= $telat_bulanan ?>], 
             backgroundColor: ['#2fb344', '#f59f00']
         }]
     },
+    // ... kode lain ...
     options: {
         cutout: '65%',
         plugins: {
