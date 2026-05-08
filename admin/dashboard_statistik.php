@@ -134,8 +134,7 @@ while ($t = mysqli_fetch_assoc($q_all_trainee)) {
 // Tambahkan baris ini SEBELUM query untuk memastikan format bulan selalu 2 digit (01, 02, dst)
 $m_safe = sprintf("%02d", $filter_bulan); 
 
-// --- 2. DATA PER DIVISI (UNTUK CHART KIRI & KANAN) ---
-// --- 2. DATA PER DIVISI (FIX TOTAL: SINKRON & NO ERROR) ---
+/// --- 2. DATA PER DIVISI (FIX: TOTAL HARUS 3 & SINKRON) ---
 $q_div = mysqli_query($connection, "
 SELECT 
     t.nama_divisi,
@@ -153,13 +152,14 @@ $data_tepat_div = [];
 $data_telat_div = []; 
 $data_total_div = [];
 
-// Langsung olah datanya di dalam while, gak usah pake foreach lagi biar gak double
 while ($r = mysqli_fetch_assoc($q_div)) {
     $labels_div[]      = $r['nama_divisi'];
     $data_tepat_div[]  = (int)$r['h_tepat'];
     $data_telat_div[]  = (int)$r['h_telat'];
+    // Total ini yang bakal bikin chart pie/distribusi jadi 3 (2 tepat + 1 telat)
     $data_total_div[]  = (int)$r['h_tepat'] + (int)$r['h_telat'];
 }
+
 
 // --- 4. TOP 5 TRAINEE PALING RAJIN (DENGAN LOGIKA DISIPLIN) ---
 $q_top = mysqli_query($connection, "SELECT 
