@@ -135,17 +135,17 @@ while ($t = mysqli_fetch_assoc($q_all_trainee)) {
 $m_safe = sprintf("%02d", $filter_bulan); 
 
 // --- 2. DATA PER DIVISI (UNTUK CHART KIRI & KANAN) ---
-$q_div = mysqli_query($connection, "SELECT 
+$q_div = mysqli_query($connection, "
+SELECT 
     t.nama_divisi,
-    COUNT(CASE WHEN p.status = 'Tepat Waktu' 
-        AND (p.jam_keluar IS NOT NULL AND p.jam_keluar != '00:00:00') THEN 1 END) as h_tepat,
-    COUNT(CASE WHEN p.status LIKE '%Terlambat%' 
-        AND (p.jam_keluar IS NOT NULL AND p.jam_keluar != '00:00:00') THEN 1 END) as h_telat
-    FROM trainee t
-    LEFT JOIN presensi p ON t.id = p.id_trainee 
-        AND DATE(p.tanggal_masuk) = '$filter_tanggal'
-    WHERE t.nama_divisi != 'HRD Manager'
-    GROUP BY t.nama_divisi");
+    p.jam_masuk,
+    l.jam_masuk as jam_kantor
+FROM trainee t
+LEFT JOIN presensi p ON t.id = p.id_trainee 
+    AND DATE(p.tanggal_masuk) = '$filter_tanggal'
+LEFT JOIN lokasi_presensi l ON l.nama_lokasi = t.lokasi_presensi
+WHERE t.nama_divisi != 'HRD Manager'
+");
 
 $divisi_data = [];
 while ($row = mysqli_fetch_assoc($q_div)) {
