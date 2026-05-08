@@ -39,18 +39,20 @@ if (!$file_foto) {
     exit;
 }
 
-/* 1) WAKTU DARI SERVER & LOGIKA TERLAMBAT (+45 Menit) */
+/* 1) WAKTU DARI SERVER & LOGIKA DISIPLIN PERMANEN (+40 Menit) */
 $tanggal_masuk = date('Y-m-d');
-$jam_masuk_skrg = date('H:i:s'); // Menggunakan jam server murni agar anti-cheat total
+$jam_masuk_skrg = date('H:i:s'); 
 
-// Hitung batas telat: Jam Buka + 45 Menit
-$batas_terlambat = date('H:i:s', strtotime($jam_buka_db . ' +45 minutes'));
+// Menggunakan toleransi 40 Menit sesuai kesepakatan agar sinkron dengan file lain
+$batas_disiplin = date('H:i:s', strtotime($jam_buka_db . ' +40 minutes'));
 
-// Tentukan status secara otomatis
-if ($jam_masuk_skrg > $batas_terlambat) {
+// Tentukan status untuk kolom 'status' dan kolom baru 'status_disiplin'
+if ($jam_masuk_skrg > $batas_disiplin) {
     $status_final = "Terlambat";
+    $status_disiplin_final = "Terlambat";
 } else {
     $status_final = "Hadir";
+    $status_disiplin_final = "Tepat Waktu";
 }
 
 /* 2) CEGAH DOUBLE PRESENSI */
@@ -88,10 +90,10 @@ if (!file_put_contents($nama_file, $data)) {
     exit;
 }
 
-/* 4) INSERT PRESENSI */
+/* 4) INSERT PRESENSI (SUDAH TERMASUK KOLOM status_disiplin) */
 $result = mysqli_query($connection, "
-    INSERT INTO presensi (id_trainee, tanggal_masuk, jam_masuk, foto_masuk, status)
-    VALUES ($id_trainee, '$tanggal_masuk', '$jam_masuk_skrg', '$file', '$status_final')
+    INSERT INTO presensi (id_trainee, tanggal_masuk, jam_masuk, foto_masuk, status, status_disiplin)
+    VALUES ($id_trainee, '$tanggal_masuk', '$jam_masuk_skrg', '$file', '$status_final', '$status_disiplin_final')
 ");
 
 if ($result) {
