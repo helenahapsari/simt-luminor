@@ -134,30 +134,57 @@ while ($t = mysqli_fetch_assoc($q_all_trainee)) {
 // Tambahkan baris ini SEBELUM query untuk memastikan format bulan selalu 2 digit (01, 02, dst)
 $m_safe = sprintf("%02d", $filter_bulan); 
 
-/// --- 2. DATA PER DIVISI (FIX: TOTAL HARUS 3 & SINKRON) ---
+// --- 2. DATA PER DIVISI (KODE AWAL LO YANG SUDAH DI-FIX) ---
 $q_div = mysqli_query($connection, "
 SELECT 
     t.nama_divisi,
-    COUNT(CASE WHEN p.status = 'Tepat Waktu' AND (p.jam_keluar IS NOT NULL AND p.jam_keluar != '00:00:00') THEN 1 END) as h_tepat,
-    COUNT(CASE WHEN p.status LIKE '%Terlambat%' AND (p.jam_keluar IS NOT NULL AND p.jam_keluar != '00:00:00') THEN 1 END) as h_telat
+    p.jam_masuk,
+    p.jam_keluar,
+    l.jam_masuk as jam_kantor
 FROM trainee t
 LEFT JOIN presensi p ON t.id = p.id_trainee 
     AND DATE(p.tanggal_masuk) = '$filter_tanggal'
+LEFT JOIN lokasi_presensi l ON l.nama_lokasi = t.lokasi_presensi
 WHERE t.nama_divisi != 'HRD Manager'
-GROUP BY t.nama_divisi
 ");
 
-$labels_div = []; 
-$data_tepat_div = []; 
-$data_telat_div = []; 
+$divisi_data = [];
+while ($row = mysqli_fetch_assoc($q_div)) {
+    $div = $row['nama_divisi'];
+
+    if (!isset($divisi_data[$div])) {
+        $divisi_data[$div] = ['tepat' => 0, 'telat' => 0];
+    }
+
+    $jam_masuk = $row['jam_masuk'];
+    $jam_keluar = $row['jam_keluar'];
+    $jam_kantor = $row['jam_kantor'];
+
+    // LOGIKA FIX: Hanya hitung yang sudah absen masuk DAN sudah absen pulang
+    if (!empty($jam_masuk) && !empty($jam_keluar) && $jam_keluar != '00:00:00') {
+        
+        $batas_telat = date('H:i:s', strtotime($jam_kantor . ' +40 minutes'));
+        $is_telat = strtotime($jam_masuk) > strtotime($batas_telat);
+
+        if ($is_telat) {
+            $divisi_data[$div]['telat']++;
+        } else {
+            $divisi_data[$div]['tepat']++;
+        }
+    }
+}
+
+// Convert ke format Chart.js (VISUAL AMAN, SUMBU X TETAP LENGKAP)
+$labels_div = [];
+$data_tepat_div = [];
+$data_telat_div = [];
 $data_total_div = [];
 
-while ($r = mysqli_fetch_assoc($q_div)) {
-    $labels_div[]      = $r['nama_divisi'];
-    $data_tepat_div[]  = (int)$r['h_tepat'];
-    $data_telat_div[]  = (int)$r['h_telat'];
-    // Total ini yang bakal bikin chart pie/distribusi jadi 3 (2 tepat + 1 telat)
-    $data_total_div[]  = (int)$r['h_tepat'] + (int)$r['h_telat'];
+foreach ($divisi_data as $div => $val) {
+    $labels_div[] = $div; // Biar semua divisi muncul di sumbu X
+    $data_tepat_div[] = (int)$val['tepat'];
+    $data_telat_div[] = (int)$val['telat'];
+    $data_total_div[] = (int)($val['tepat'] + $val['telat']); // Ini yang bikin Pie Chart jadi 3
 }
 
 
