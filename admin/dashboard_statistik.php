@@ -259,14 +259,15 @@ $q_jam = mysqli_query($connection, "SELECT
     FROM presensi WHERE tanggal_masuk = '$filter_tanggal'");
 $d_jam = mysqli_fetch_assoc($q_jam);
 
-// ASLINYA: status = 'Hadir' (INI SALAH, GANTI JADI 'On Time')
 // --- 8. DATA BULANAN (REPLACE BAGIAN INI) ---
 $q_bulanan_fix = mysqli_query($connection, "SELECT  
-    COUNT(CASE WHEN status = 'Hadir' THEN 1 END) as total_hadir_fix,  
-    COUNT(CASE WHEN status LIKE '%Terlambat%' THEN 1 END) as total_telat_fix
+    COUNT(CASE WHEN status_disiplin = 'Tepat Waktu' THEN 1 END) as total_hadir_fix,  
+    COUNT(CASE WHEN status_disiplin = 'Terlambat' THEN 1 END) as total_telat_fix
     FROM presensi
     WHERE MONTH(tanggal_masuk) = '$filter_bulan'
-    AND YEAR(tanggal_masuk) = '$filter_tahun'");
+    AND YEAR(tanggal_masuk) = '$filter_tahun'
+    -- TAMBAHKAN INI: Supaya data Alpa/Gantung tidak ikut terhitung telat
+    AND (jam_keluar != '00:00:00' OR DATE(tanggal_masuk) = CURDATE())");
 
 $d_bulanan_ok = mysqli_fetch_assoc($q_bulanan_fix);
 
@@ -610,39 +611,32 @@ new Chart(document.getElementById('chartJam'), {
     }
 });
 
-// 8. Persentase Kedisiplinan Trainee (Bulan Ini) - FIX KOSONG
 new Chart(document.getElementById('chartDisiplin'), {
-    type: 'doughnut', // Pastikan type tertulis jelas di sini
-    plugins: [ChartDataLabels],
+    type: 'doughnut', // Gunakan doughnut agar lebih modern
+    plugins: [ChartDataLabels], // PASTIKAN INI ADA
     data: {
         labels: ['Tepat Waktu', 'Terlambat'],
         datasets: [{
-            data: [
-                <?= (int)($tepat_bulan_final ?? 0) ?>, 
-                <?= (int)($telat_bulan_final ?? 0) ?>
-            ], 
+            data: [<?= (int)$tepat_bulan_final ?>, <?= (int)$telat_bulan_final ?>], 
             backgroundColor: ['#2fb344', '#f59f00']
         }]
     },
     options: {
         cutout: '65%',
-        responsive: true,
-        maintainAspectRatio: false,
         plugins: {
-            legend: {
-                position: 'bottom',
-                display: true
-            },
+            legend: { position: 'bottom' },
             datalabels: {
-                color: '#fff',
-                font: { weight: 'bold', size: 13 },
+                color: '#fff', // Warna teks angka
+                font: { weight: 'bold', size: 14 },
                 formatter: (value, ctx) => {
                     let sum = 0;
                     let dataArr = ctx.chart.data.datasets[0].data;
                     dataArr.map(data => { sum += data; });
-                    if (sum === 0) return ''; 
+                    if (sum === 0) return null;
+                    
+                    // Menampilkan Angka Asli dan Persentase
                     let percentage = (value * 100 / sum).toFixed(0) + "%";
-                    return value > 0 ? percentage : '';
+                    return value + " (" + percentage + ")"; 
                 }
             }
         }
@@ -651,6 +645,4 @@ new Chart(document.getElementById('chartDisiplin'), {
 
 </script>
 
-
 <?php include('layout/footer.php'); ?>
-
