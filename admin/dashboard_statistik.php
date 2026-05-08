@@ -134,21 +134,66 @@ while ($t = mysqli_fetch_assoc($q_all_trainee)) {
 // Tambahkan baris ini SEBELUM query untuk memastikan format bulan selalu 2 digit (01, 02, dst)
 $m_safe = sprintf("%02d", $filter_bulan); 
 
-$q_div = mysqli_query($connection, "SELECT nama_divisi, 
-    COUNT(CASE WHEN status = 'Tepat Waktu' THEN 1 END) as h_tepat,
-    COUNT(CASE WHEN status LIKE '%Terlambat%' THEN 1 END) as h_telat
-    FROM trainee 
-    LEFT JOIN presensi ON trainee.id = presensi.id_trainee 
-    AND tanggal_masuk = '$filter_tanggal'
-    WHERE nama_divisi != 'HRD Manager'
-    GROUP BY nama_divisi");
+$q_div = mysqli_query($connection, "
+SELECT 
+    t.nama_divisi,
+    p.jam_masuk,
+    p.jam_keluar,
+    p.tanggal_masuk,
+    l.jam_masuk as jam_kantor
+FROM trainee t
+LEFT JOIN presensi p ON t.id = p.id_trainee 
+    AND DATE(p.tanggal_masuk) = '$filter_tanggal'
+LEFT JOIN lokasi_presensi l ON l.nama_lokasi = t.lokasi_presensi
+WHERE t.nama_divisi != 'HRD Manager'
+");
 
 $labels_div = []; $data_tepat_div = []; $data_telat_div = []; $data_total_div = [];
-while($r = mysqli_fetch_assoc($q_div)){
-    $labels_div[] = $r['nama_divisi'];
-    $data_tepat_div[] = $r['h_tepat'];
-    $data_telat_div[] = $r['h_telat'];
-    $data_total_div[] = $r['h_tepat'] + $r['h_telat'];
+$divisi_data = [];
+
+while ($row = mysqli_fetch_assoc($q_div)) {
+
+    $div = $row['nama_divisi'];
+
+    if (!isset($divisi_data[$div])) {
+        $divisi_data[$div] = [
+            'tepat' => 0,
+            'telat' => 0
+        ];
+    }
+
+    $jam_masuk = $row['jam_masuk'];
+    $jam_keluar = $row['jam_keluar'];
+    $tanggal = $row['tanggal_masuk'];
+    $jam_kantor = $row['jam_kantor'];
+
+    if (!empty($jam_masuk)) {
+
+        $batas_telat = date('H:i:s', strtotime($jam_kantor . ' +40 minutes'));
+        $is_telat = strtotime($jam_masuk) > strtotime($batas_telat);
+
+        // 🔥 RULE FINAL (SAMA KAYAK REKAP)
+        if (!empty($jam_keluar) && $jam_keluar != '00:00:00') {
+            if ($is_telat) {
+                $divisi_data[$div]['telat']++;
+            } else {
+                $divisi_data[$div]['tepat']++;
+            }
+        }
+    }
+}
+
+// Convert ke array chart
+$labels_div = [];
+$data_tepat_div = [];
+$data_telat_div = [];
+$data_total_div = [];
+
+foreach ($divisi_data as $div => $val) {
+    $labels_div[] = $div;
+    $data_tepat_div[] = $val['tepat'];
+    $data_telat_div[] = $val['telat'];
+    $data_total_div[] = $val['tepat'] + $val['telat'];
 }
 
 // --- 4. TOP 5 TRAINEE PALING RAJIN (DENGAN LOGIKA DISIPLIN) ---
