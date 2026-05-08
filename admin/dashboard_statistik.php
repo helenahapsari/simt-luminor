@@ -194,14 +194,13 @@ $q_jam = mysqli_query($connection, "SELECT
     FROM presensi WHERE tanggal_masuk = '$filter_tanggal'");
 $d_jam = mysqli_fetch_assoc($q_jam);
 
+// ASLINYA: status = 'Hadir' (INI SALAH, GANTI JADI 'On Time')
 $q_bulanan = mysqli_query($connection, "SELECT 
     COUNT(CASE WHEN status = 'On Time' THEN 1 END) as tepat, 
     COUNT(CASE WHEN status LIKE '%Terlambat%' THEN 1 END) as telat
     FROM presensi
     WHERE MONTH(tanggal_masuk) = '$filter_bulan'
     AND YEAR(tanggal_masuk) = '$filter_tahun'");
-
-$d_bulanan = mysqli_fetch_assoc($q_bulanan);
 
 // Ambil angka aslinya
 $tepat = (int)$d_bulanan['tepat'];
