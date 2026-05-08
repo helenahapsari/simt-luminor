@@ -47,19 +47,16 @@ $filter_tanggal = $_GET['tanggal'] ?? date('Y-m-d');
 $filter_bulan = date('m', strtotime($filter_tanggal));
 $filter_tahun = date('Y', strtotime($filter_tanggal));
 
-// 1. Ambil Total Trainee yang BENERAN (Role Trainee & Aktif)
-$q_all = mysqli_query($connection, "SELECT COUNT(*) as total FROM users WHERE role = 'Trainee' AND status = 'Aktif'");
-$total_trainee = (int)mysqli_fetch_assoc($q_all)['total']; // Hasil: 23
+// 1. Ambil Total Trainee yang BENERAN (Role Trainee & Aktif)$q_all = mysqli_query($connection, "SELECT COUNT(*) as total FROM trainee");
+$total_trainee = mysqli_fetch_assoc($q_all)['total'];
 
-// 2. Hitung yang Hadir (Tepat Waktu & Terlambat)
 $q_presensi = mysqli_query($connection, "SELECT 
-    COUNT(CASE WHEN status = 'Hadir' OR status = 'On Time' THEN 1 END) as tepat,
+    COUNT(CASE WHEN status = 'Tepat Waktu' THEN 1 END) as tepat,
     COUNT(CASE WHEN status LIKE '%Terlambat%' THEN 1 END) as telat
     FROM presensi WHERE tanggal_masuk = '$filter_tanggal'");
 $d_presensi = mysqli_fetch_assoc($q_presensi);
-
-$jml_tepat = (int)$d_presensi['tepat'];
-$jml_telat = (int)$d_presensi['telat'];
+$total_hadir_today = $d_presensi['tepat'] + $d_presensi['telat'];
+$total_alpa_today = $total_trainee - $total_hadir_today;
 
 // 3. Hitung Sakit/Izin (PENTING: Biar gak dituduh Alpa)
 $q_sic = mysqli_query($connection, "SELECT COUNT(DISTINCT id_trainee) AS jml FROM ketidakhadiran WHERE tanggal = '$filter_tanggal'");
@@ -290,7 +287,6 @@ new Chart(document.getElementById('chartSnapshot'), {
                 <?= $jml_izin ?>, 
                 <?= $total_alpa_today ?>
             ],
-            // Hijau, Orange, Biru, Merah
             backgroundColor: ['#2fb344', '#f59f00', '#4299e1', '#d63939']
         }]
     },
