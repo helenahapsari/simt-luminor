@@ -61,15 +61,19 @@ JOIN lokasi_presensi l ON l.nama_lokasi = t.lokasi_presensi
 WHERE DATE(p.tanggal_masuk) = '$filter_tanggal'
 ");
 
+echo "<pre>";
+while ($row = mysqli_fetch_assoc($q_all)) {
+    print_r($row);
+}
+echo "</pre>";
+exit;
+
 // Inisialisasi
 $tepat = 0;
 $telat = 0;
 $alpa_masuk = 0;
 
 $hari_ini = date('Y-m-d');
-
-while ($row = mysqli_fetch_assoc($q_all)) {
-
     echo $row['jam_masuk'] . " | " . $row['jam_kantor'] . "<br>";
 
     $jam_masuk = $row['jam_masuk'];
@@ -94,7 +98,6 @@ while ($row = mysqli_fetch_assoc($q_all)) {
             $alpa_masuk++;
         }
     }
-}
 
 // HITUNG IZIN
 $q_izin = mysqli_query($connection, "
