@@ -61,12 +61,24 @@ JOIN lokasi_presensi l ON l.nama_lokasi = t.lokasi_presensi
 WHERE DATE(p.tanggal_masuk) = '$filter_tanggal'
 ");
 
-echo "<pre>";
 while ($row = mysqli_fetch_assoc($q_all)) {
-    print_r($row);
+
+    $jam_masuk = $row['jam_masuk'];
+    $jam_kantor = $row['jam_kantor'];
+
+    $batas_telat = date('H:i:s', strtotime("+40 minutes", strtotime($jam_kantor)));
+    $is_telat = strtotime($jam_masuk) > strtotime($batas_telat);
+
+    // DEBUG DI SINI
+    echo "<pre>";
+    echo "Jam Masuk: " . $jam_masuk . "\n";
+    echo "Jam Kantor: " . $jam_kantor . "\n";
+    echo "Batas Telat: " . $batas_telat . "\n";
+    echo "Is Telat: " . ($is_telat ? 'YA' : 'TIDAK') . "\n";
+    echo "----------------------\n";
+    echo "</pre>";
+
 }
-echo "</pre>";
-exit;
 
 // Inisialisasi
 $tepat = 0;
