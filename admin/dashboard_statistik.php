@@ -47,18 +47,28 @@ $filter_tanggal = $_GET['tanggal'] ?? date('Y-m-d');
 $filter_bulan = date('m', strtotime($filter_tanggal));
 $filter_tahun = date('Y', strtotime($filter_tanggal));
 
-// --- 1. DATA SNAPSHOT HARI INI (DOUGHNUT) ---
-// Logika Alpa: Total Trainee - Total Hadir hari ini
-$q_all = mysqli_query($connection, "SELECT COUNT(*) as total FROM trainee");
-$total_trainee = mysqli_fetch_assoc($q_all)['total'];
+// 1. Ambil Total Trainee yang BENERAN (Role Trainee & Aktif)
+$q_all = mysqli_query($connection, "SELECT COUNT(*) as total FROM users WHERE role = 'Trainee' AND status = 'Aktif'");
+$total_trainee = (int)mysqli_fetch_assoc($q_all)['total']; // Hasil: 23
 
+// 2. Hitung yang Hadir (Tepat Waktu & Terlambat)
 $q_presensi = mysqli_query($connection, "SELECT 
-    COUNT(CASE WHEN status = 'Tepat Waktu' THEN 1 END) as tepat,
+    COUNT(CASE WHEN status = 'Hadir' OR status = 'On Time' THEN 1 END) as tepat,
     COUNT(CASE WHEN status LIKE '%Terlambat%' THEN 1 END) as telat
     FROM presensi WHERE tanggal_masuk = '$filter_tanggal'");
 $d_presensi = mysqli_fetch_assoc($q_presensi);
-$total_hadir_today = $d_presensi['tepat'] + $d_presensi['telat'];
-$total_alpa_today = $total_trainee - $total_hadir_today;
+
+$jml_tepat = (int)$d_presensi['tepat'];
+$jml_telat = (int)$d_presensi['telat'];
+
+// 3. Hitung Sakit/Izin (PENTING: Biar gak dituduh Alpa)
+$q_sic = mysqli_query($connection, "SELECT COUNT(DISTINCT id_trainee) AS jml FROM ketidakhadiran WHERE tanggal = '$filter_tanggal'");
+$jml_izin = (int)(mysqli_fetch_assoc($q_sic)['jml'] ?? 0);
+
+// 4. Hitung Alpa (Sisa murni)
+$total_alpa_today = $total_trainee - ($jml_tepat + $jml_telat + $jml_izin);
+if ($total_alpa_today < 0) $total_alpa_today = 0;
+
 
 // Tambahkan baris ini SEBELUM query untuk memastikan format bulan selalu 2 digit (01, 02, dst)
 $m_safe = sprintf("%02d", $filter_bulan); 
@@ -129,7 +139,7 @@ for ($i = 6; $i >= 0; $i--) {
 }
 
 // --- 7. ANALISIS JAM MASUK (BAR 15 MENIT) ---
-$q_total = mysqli_query($connection, "SELECT COUNT(*) as total FROM trainee"); // sesuaikan nama tabel lo
+$q_total = mysqli_query($connection, "SELECT COUNT(*) as total FROM users WHERE role = 'Trainee' AND status = 'Aktif'");
 $d_total = mysqli_fetch_assoc($q_total);
 $max_trainee = $d_total['total'];
 
@@ -269,16 +279,19 @@ const yAxisConfig = {
 // 1. Snapshot (Doughnut) -- Pakai (Hari Ini)
 new Chart(document.getElementById('chartSnapshot'), {
     type: 'doughnut',
-    plugins: [ChartDataLabels], // DAFTARKAN DI SINI SAJA
+    plugins: [ChartDataLabels],
     data: {
-        labels: ['Tepat Waktu', 'Terlambat', 'Alpa'],
+        // Tambahkan label Sakit/Izin di sini
+        labels: ['Tepat Waktu', 'Terlambat', 'Sakit/Izin', 'Alpa'],
         datasets: [{
             data: [
-                <?= (int)($d_presensi['tepat'] ?? 0) ?>, 
-                <?= (int)($d_presensi['telat'] ?? 0) ?>, 
-                <?= (int)($total_alpa_today ?? 0) ?>
+                <?= $jml_tepat ?>, 
+                <?= $jml_telat ?>, 
+                <?= $jml_izin ?>, 
+                <?= $total_alpa_today ?>
             ],
-            backgroundColor: ['#2fb344', '#f59f00', '#d63939']
+            // Hijau, Orange, Biru, Merah
+            backgroundColor: ['#2fb344', '#f59f00', '#4299e1', '#d63939']
         }]
     },
     options: {

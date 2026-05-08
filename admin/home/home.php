@@ -19,25 +19,37 @@ include('../layout/header.php');
 
 $tanggal_hari_ini = date('Y-m-d');
 
-/* --- LOGIKA HITUNG DATA --- */
-// 1. Total trainee aktif
-$q_total = mysqli_query($connection, "SELECT COUNT(*) AS total FROM users WHERE status = 'Aktif' AND role IN ('trainee','Trainee')");
+/* --- LOGIKA HITUNG DATA (FIXED) --- */
+// 1. Total trainee aktif (Hanya Trainee & Aktif)
+$q_total = mysqli_query($connection, "SELECT COUNT(*) AS total FROM users WHERE status = 'Aktif' AND role = 'Trainee'");
 $total_trainee_aktif = (int)(mysqli_fetch_assoc($q_total)['total'] ?? 0);
 
-// 2. Hitung Tepat Waktu
-$q_tepat = mysqli_query($connection, "SELECT COUNT(DISTINCT id_trainee) AS jml FROM presensi WHERE tanggal_masuk = '$tanggal_hari_ini' AND status = 'Hadir'");
+// 2. Hitung Tepat Waktu (Hanya Trainee)
+$q_tepat = mysqli_query($connection, "SELECT COUNT(DISTINCT p.id_trainee) AS jml 
+    FROM presensi p 
+    JOIN users u ON p.id_trainee = u.id 
+    WHERE p.tanggal_masuk = '$tanggal_hari_ini' AND p.status = 'Hadir' AND u.role = 'Trainee'");
 $jml_tepat = (int)(mysqli_fetch_assoc($q_tepat)['jml'] ?? 0);
 
-// 3. Hitung Terlambat
-$q_telat = mysqli_query($connection, "SELECT COUNT(DISTINCT id_trainee) AS jml FROM presensi WHERE tanggal_masuk = '$tanggal_hari_ini' AND status = 'Terlambat'");
+// 3. Hitung Terlambat (Hanya Trainee)
+$q_telat = mysqli_query($connection, "SELECT COUNT(DISTINCT p.id_trainee) AS jml 
+    FROM presensi p 
+    JOIN users u ON p.id_trainee = u.id 
+    WHERE p.tanggal_masuk = '$tanggal_hari_ini' AND p.status = 'Terlambat' AND u.role = 'Trainee'");
 $jml_telat = (int)(mysqli_fetch_assoc($q_telat)['jml'] ?? 0);
 
-// 4. TOTAL HADIR (Gabungan Tepat + Telat)
 $total_kehadiran = $jml_tepat + $jml_telat;
 
-// 5. Jumlah Sakit/Izin
-$q_sic = mysqli_query($connection, "SELECT COUNT(DISTINCT id_trainee) AS jml FROM ketidakhadiran WHERE tanggal = '$tanggal_hari_ini'");
+// 4. Jumlah Sakit/Izin (Hanya Trainee)
+$q_sic = mysqli_query($connection, "SELECT COUNT(DISTINCT k.id_trainee) AS jml 
+    FROM ketidakhadiran k 
+    JOIN users u ON k.id_trainee = u.id 
+    WHERE k.tanggal = '$tanggal_hari_ini' AND u.role = 'Trainee'");
 $jumlah_sakit_izin_cuti = (int)(mysqli_fetch_assoc($q_sic)['jml'] ?? 0);
+
+// 5. JUMLAH ALPA (PASTI SINKRON)
+$jumlah_alpa = $total_trainee_aktif - ($total_kehadiran + $jumlah_sakit_izin_cuti);
+if ($jumlah_alpa < 0) $jumlah_alpa = 0;
 
 // 6. Jumlah Alpa (Total Aktif - Semua yang ada datanya)
 $jumlah_alpa = $total_trainee_aktif - ($total_kehadiran + $jumlah_sakit_izin_cuti);
