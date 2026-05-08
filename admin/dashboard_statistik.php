@@ -172,19 +172,18 @@ while ($row = mysqli_fetch_assoc($q_div)) {
 }
 
 // Convert ke format Chart.js (Visual tetap sama seperti yang lo minta)
+// --- Convert ke format Chart.js ---
 $labels_div = [];
 $data_tepat_div = [];
 $data_telat_div = [];
 $data_total_div = [];
 
+// Looping semua hasil dari kueri awal (agar semua divisi tetap muncul di sumbu X)
 foreach ($divisi_data as $div => $val) {
-    // Hanya masukkan ke array jika ada yang hadir (biar chart nggak penuh batang kosong)
-    if ($val['tepat'] > 0 || $val['telat'] > 0) {
-        $labels_div[] = $div;
-        $data_tepat_div[] = (int)$val['tepat'];
-        $data_telat_div[] = (int)$val['telat'];
-        $data_total_div[] = (int)($val['tepat'] + $val['telat']);
-    }
+    $labels_div[] = $div; // Nama divisi (Accounting, Sales, dll) tetap masuk
+    $data_tepat_div[] = (int)$val['tepat']; // Isi 0 kalau belum ada data
+    $data_telat_div[] = (int)$val['telat']; // Isi 0 kalau belum ada data
+    $data_total_div[] = (int)($val['tepat'] + $val['telat']);
 }
 
 // --- 4. TOP 5 TRAINEE PALING RAJIN (DENGAN LOGIKA DISIPLIN) ---
