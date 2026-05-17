@@ -18,22 +18,39 @@ include('../layout/header.php');
 <?php
 $id_trainee = $_SESSION['id'];
 
-// 1. HITUNG HADIR
-$q_hadir = mysqli_query($connection, "SELECT COUNT(*) as total FROM presensi WHERE id_trainee = '$id_trainee' AND jam_keluar IS NOT NULL AND jam_keluar != '' AND jam_keluar != '-'");
-$total_hadir = mysqli_fetch_assoc($q_hadir)['total'];
+$id_trainee = $_SESSION['id'];
 
-// 2. HITUNG TELAT
+// 1. KOTAK HADIR (Absen Fisik + Izin yang di-ACC)
+$q_hadir_fisik = mysqli_query($connection, "SELECT COUNT(*) as total FROM presensi WHERE id_trainee = '$id_trainee' AND jam_keluar IS NOT NULL AND jam_keluar != '' AND jam_keluar != '-'");
+$total_hadir_fisik = mysqli_fetch_assoc($q_hadir_fisik)['total'];
+
+$q_izin_sah = mysqli_query($connection, "SELECT COUNT(*) as total FROM ketidakhadiran WHERE id_trainee = '$id_trainee' AND status_pengajuan = 'Approved'");
+$total_izin = mysqli_fetch_assoc($q_izin_sah)['total'] ?? 0;
+
+$total_hadir = $total_hadir_fisik + $total_izin;
+
+
+// 2. KOTAK TERLAMBAT
 $q_telat = mysqli_query($connection, "SELECT COUNT(*) as total FROM presensi WHERE id_trainee = '$id_trainee' AND status LIKE '%Terlambat%' AND jam_keluar IS NOT NULL AND jam_keluar != '' AND jam_keluar != '-'");
 $total_telat = mysqli_fetch_assoc($q_telat)['total'];
 
-// 3. HITUNG ALPA (Pastikan nama variabelnya $total_alpa)
+
+// 3. KOTAK ALPA (Hanya hitung yang MODAL NEKAT gak absen DAN izinnya pending/reject)
 $q_lupa = mysqli_query($connection, "SELECT COUNT(*) as total FROM presensi WHERE id_trainee = '$id_trainee' AND (jam_keluar IS NULL OR jam_keluar = '' OR jam_keluar = '-')");
 $total_lupa = mysqli_fetch_assoc($q_lupa)['total'];
 
-$q_izin_gagal = mysqli_query($connection, "SELECT COUNT(*) as total FROM ketidakhadiran WHERE id_trainee = '$id_trainee' AND (status_pengajuan = 'Pending' OR status_pengajuan = 'Rejected')");
-$total_gagal = mysqli_fetch_assoc($q_izin_gagal)['total'] ?? 0;
+// Query pintar: Cek yang pending/reject TAPI di tanggal itu emang gak ada riwayat absen sama sekali
+$q_izin_gagal_valid = mysqli_query($connection, "
+    SELECT COUNT(*) as total FROM ketidakhadiran 
+    WHERE id_trainee = '$id_trainee' 
+    AND (status_pengajuan = 'Pending' OR status_pengajuan = 'Rejected')
+    AND tanggal NOT IN (
+        SELECT DISTINCT tanggal_masuk FROM presensi WHERE id_trainee = '$id_trainee'
+    )
+");
+$total_gagal_valid = mysqli_fetch_assoc($q_izin_gagal_valid)['total'] ?? 0;
 
-$total_alpa = $total_lupa + $total_gagal;
+$total_alpa = $total_lupa + $total_gagal_valid;
 ?>
 
 
