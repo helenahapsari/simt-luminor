@@ -35,16 +35,35 @@ while($trainee = mysqli_fetch_array($result)){
 
 // --- 2. LOGIKA HITUNG STATISTIK (Sesuai Request Lo) ---
 
-// 1. HITUNG HADIR (Tetap sama)
-$q_hadir = mysqli_query($connection, "SELECT COUNT(*) as total FROM presensi WHERE id_trainee = '$id_trainee' AND jam_keluar IS NOT NULL AND jam_keluar != '' AND jam_keluar != '-'");
-$total_hadir = mysqli_fetch_assoc($q_hadir)['total'];
+// 1. HITUNG HADIR (Presensi Fisik Lengkap + Izin Approved yang Gak Bentrok Lupa Pulang)
+// A. Hitung presensi fisik yang sukses ada jam pulangnya
+$q_hadir_fisik = mysqli_query($connection, "SELECT COUNT(*) as total FROM presensi WHERE id_trainee = '$id_trainee' AND jam_keluar IS NOT NULL AND jam_keluar != '' AND jam_keluar != '-'");
+$total_hadir_fisik = mysqli_fetch_assoc($q_hadir_fisik)['total'];
+
+// B. Hitung SEMUA izin yang di-Approved oleh admin
+$q_izin_sah = mysqli_query($connection, "SELECT COUNT(*) as total FROM ketidakhadiran WHERE id_trainee = '$id_trainee' AND status_pengajuan = 'Approved'");
+$total_izin = mysqli_fetch_assoc($q_izin_sah)['total'] ?? 0;
+
+// C. Pengecualian: Hitung data izin Approved yang tanggalnya tabrakan dengan kasus LUPA ABSEN PULANG
+$q_batal_hadir = mysqli_query($connection, "
+    SELECT COUNT(*) as total FROM ketidakhadiran k
+    JOIN presensi p ON k.id_trainee = p.id_trainee AND k.tanggal = p.tanggal_masuk
+    WHERE k.id_trainee = '$id_trainee' 
+    AND k.status_pengajuan = 'Approved'
+    AND (p.jam_keluar IS NULL OR p.jam_keluar = '' OR p.jam_keluar = '-')
+");
+$total_batal = mysqli_fetch_assoc($q_batal_hadir)['total'] ?? 0;
+
+// Gabungkan pakai rumus matematika biar dapet angka 6 pas diakun lo
+$total_hadir = $total_hadir_fisik + $total_izin - $total_batal;
+
 
 // 2. HITUNG TERLAMBAT (Tetap sama)
 $q_telat = mysqli_query($connection, "SELECT COUNT(*) as total FROM presensi WHERE id_trainee = '$id_trainee' AND status LIKE '%Terlambat%' AND jam_keluar IS NOT NULL AND jam_keluar != '' AND jam_keluar != '-'");
 $total_telat = mysqli_fetch_assoc($q_telat)['total'];
 
-// 3. HITUNG ALPA (Logika Baru: Yang Lupa Pulang + Yang Izinnya Belum/Gak di-ACC)
 
+// 3. HITUNG ALPA (Tetap sama sesuai kode awal lo)
 // Hitung baris presensi yang jam pulangnya '-' (Lupa Pulang)
 $q_lupa = mysqli_query($connection, "SELECT COUNT(*) as total FROM presensi WHERE id_trainee = '$id_trainee' AND (jam_keluar IS NULL OR jam_keluar = '' OR jam_keluar = '-')");
 $total_lupa = mysqli_fetch_assoc($q_lupa)['total'];
