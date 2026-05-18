@@ -184,7 +184,7 @@ $server_time_now = date('Y-m-d H:i:s');
     text-shadow: 0 8px 25px rgba(255,255,255,.16) !important;
   }
 </style>
-
+<!-- 
 <div class="page-body">
   <div class="container-xl">
     <div class="row mb-3 mt-2">
@@ -213,7 +213,8 @@ $server_time_now = date('Y-m-d H:i:s');
           </div>
       </div>
   </div>
-</div>
+</div> -->
+
     <div class="row mb-4">
       <div class="col">
         <div class="home-hero">
