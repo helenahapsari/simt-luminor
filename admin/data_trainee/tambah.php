@@ -4,9 +4,11 @@ session_start();
 
 if(!isset($_SESSION['login'])){
   header('Location: ../../auth/login.php?pesan=belum_login');
+  exit;
 }
 else if($_SESSION['role'] != 'Admin'){
   header('Location: ../../auth/login.php?pesan=tolak_akses');
+  exit;
 }
 
 $judul = 'Tambah Data Trainee';
@@ -64,12 +66,20 @@ if(isset($_POST['submit'])){
     if(empty($lokasi_presensi)) $pesan_kesalahan[] = "Lokasi Presensi wajib diisi!";
     if($_POST['password'] != $_POST['ulangi_password']) $pesan_kesalahan[] = "Password tidak sama!";
 
+    // --- KUNCI PERBAIKAN: Validasi Cek Username Duplikat ---
+    if(!empty($username)){
+      $cek_username = mysqli_query($connection, "SELECT username FROM users WHERE username = '$username'");
+      if(mysqli_num_rows($cek_username) > 0){
+        $pesan_kesalahan[] = "Gagal! Username <strong>{$username}</strong> sudah terdaftar di sistem. Gunakan username lain!";
+      }
+    }
+
     if(!empty($pesan_kesalahan)){
       $_SESSION['validasi'] = implode('<br>', $pesan_kesalahan);
     } else { 
-      // Query INSERT ke tabel trainee (nama_divisi sesuai DB lo)
+      // Query INSERT ke tabel trainee (Aman dijalankan jika lolos cek username)
       $trainee = mysqli_query($connection, "INSERT INTO trainee(nip, nama, jenis_kelamin, alamat, no_handphone, nama_divisi, lokasi_presensi, foto) 
-                 VALUES('$nip', '$nama', '$jenis_kelamin', '$alamat', '$no_handphone', '$divisi', '$lokasi_presensi', '$nama_file')");
+                   VALUES('$nip', '$nama', '$jenis_kelamin', '$alamat', '$no_handphone', '$divisi', '$lokasi_presensi', '$nama_file')");
       
       $id_trainee = mysqli_insert_id($connection);
       
@@ -87,6 +97,15 @@ if(isset($_POST['submit'])){
 
 <div class="page-body">
   <div class="container-xl">
+    <?php if(isset($_SESSION['validasi'])): ?>
+      <div class="alert alert-danger alert-dismissible" role="alert">
+        <div class="d-flex">
+          <div><?= $_SESSION['validasi']; ?></div>
+        </div>
+        <?php unset($_SESSION['validasi']); ?>
+      </div>
+    <?php endif; ?>
+
     <form action="" method="POST" enctype="multipart/form-data">
       <div class="row">
         <div class="col-md-6">
@@ -100,8 +119,8 @@ if(isset($_POST['submit'])){
                 <label>Jenis Kelamin</label>
                 <select name="jenis_kelamin" class="form-control">
                   <option value="">-- Pilih Jenis Kelamin --</option>
-                  <option value="Laki-laki">Laki-laki</option>
-                  <option value="Perempuan">Perempuan</option>
+                  <option value="Laki-laki" <?= (isset($_POST['jenis_kelamin']) && $_POST['jenis_kelamin'] == 'Laki-laki') ? 'selected' : '' ?>>Laki-laki</option>
+                  <option value="Perempuan" <?= (isset($_POST['jenis_kelamin']) && $_POST['jenis_kelamin'] == 'Perempuan') ? 'selected' : '' ?>>Perempuan</option>
                 </select>
               </div>
               <div class="mb-3">
@@ -117,7 +136,7 @@ if(isset($_POST['submit'])){
                 <select name="divisi" class="form-control">
                   <option value="">-- Pilih Divisi --</option>
                   <?php while($row_divisi = mysqli_fetch_assoc($ambil_divisi)): ?>
-                    <option value="<?= $row_divisi['nama_divisi'] ?>"><?= $row_divisi['nama_divisi']; ?></option>
+                    <option value="<?= $row_divisi['nama_divisi'] ?>" <?= (isset($_POST['divisi']) && $_POST['divisi'] == $row_divisi['nama_divisi']) ? 'selected' : '' ?>><?= $row_divisi['nama_divisi']; ?></option>
                   <?php endwhile; ?>
                 </select>
               </div>
@@ -125,8 +144,8 @@ if(isset($_POST['submit'])){
                 <label>Status</label>
                 <select name="status" class="form-control">
                   <option value="">-- Pilih Status --</option>
-                  <option value="Aktif">Aktif</option>
-                  <option value="Tidak Aktif">Tidak Aktif</option>
+                  <option value="Aktif" <?= (isset($_POST['status']) && $_POST['status'] == 'Aktif') ? 'selected' : '' ?>>Aktif</option>
+                  <option value="Tidak Aktif" <?= (isset($_POST['status']) && $_POST['status'] == 'Tidak Aktif') ? 'selected' : '' ?>>Tidak Aktif</option>
                 </select>
               </div>
             </div>
@@ -152,8 +171,8 @@ if(isset($_POST['submit'])){
                 <label>Role</label>
                 <select name="role" class="form-control">
                   <option value="">-- Pilih Role --</option>
-                  <option value="Admin">Admin</option>
-                  <option value="Trainee">Trainee</option>
+                  <option value="Admin" <?= (isset($_POST['role']) && $_POST['role'] == 'Admin') ? 'selected' : '' ?>>Admin</option>
+                  <option value="Trainee" <?= (isset($_POST['role']) && $_POST['role'] == 'Trainee') ? 'selected' : '' ?>>Trainee</option>
                 </select>
               </div>
               <div class="mb-3">
@@ -161,13 +180,13 @@ if(isset($_POST['submit'])){
                 <select name="lokasi_presensi" class="form-control">
                   <option value="">-- Pilih Lokasi --</option>
                   <?php while($row_lokasi = mysqli_fetch_assoc($ambil_lok_presensi)): ?>
-                    <option value="<?= $row_lokasi['nama_lokasi']; ?>"><?= $row_lokasi['nama_lokasi']; ?></option>
+                    <option value="<?= $row_lokasi['nama_lokasi']; ?>" <?= (isset($_POST['lokasi_presensi']) && $_POST['lokasi_presensi'] == $row_lokasi['nama_lokasi']) ? 'selected' : '' ?>><?= $row_lokasi['nama_lokasi']; ?></option>
                   <?php endwhile; ?>
                 </select>
               </div>
               <div class="mb-3">
                 <label>Foto</label>
-                <input type="file" class="form-control" name="foto">
+                <input type="file" class="form-control" name="foto" accept="image/png, image/jpeg, image/jpg">
               </div>
               <button type="submit" class="btn btn-primary" name="submit">Simpan</button>
             </div>
