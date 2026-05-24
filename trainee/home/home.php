@@ -184,36 +184,6 @@ $server_time_now = date('Y-m-d H:i:s');
     text-shadow: 0 8px 25px rgba(255,255,255,.16) !important;
   }
 </style>
-<!-- 
-<div class="page-body">
-  <div class="container-xl">
-    <div class="row mb-3 mt-2">
-    <div class="col-4">
-        <div class="card shadow-sm border-0" style="background-color: rgba(40, 167, 69, 0.1);">
-            <div class="card-body p-2 text-center">
-                <div class="text-uppercase text-muted font-weight-bold" style="font-size: 10px;">Hadir</div>
-                <div class="h3 mb-0 text-success font-weight-bold"><?= $total_hadir; ?></div>
-            </div>
-        </div>
-    </div>
-    <div class="col-4">
-    <div class="card shadow-sm border-0" style="background-color: rgba(255, 193, 7, 0.1);">
-        <div class="card-body p-2 text-center">
-            <div class="text-uppercase text-muted font-weight-bold" style="font-size: 10px;">Terlambat</div>
-            <div class="h3 mb-0 text-warning font-weight-bold"><?php echo $total_telat; ?></div>
-        </div>
-    </div>
-  </div>
-
-  <div class="col-4">
-      <div class="card shadow-sm border-0" style="background-color: rgba(220, 53, 69, 0.1);">
-          <div class="card-body p-2 text-center">
-              <div class="text-uppercase text-muted font-weight-bold" style="font-size: 10px;">Alpa</div>
-              <div class="h3 mb-0 text-danger font-weight-bold"><?php echo $total_alpa; ?></div>
-          </div>
-      </div>
-  </div>
-</div> -->
 
     <div class="row mb-4">
       <div class="col">
