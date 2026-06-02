@@ -15,7 +15,7 @@ include('../layout/header.php');
 
 ?>
 
-<?php
+<!-- <?php
 $id_trainee = $_SESSION['id'];
 
 // 1. KOTAK HADIR (Murni yang datang dan absen pulang)
@@ -29,7 +29,7 @@ $total_telat = mysqli_fetch_assoc($q_telat)['total'];
 // 3. KOTAK ALPA (Murni kasus Lupa Absen Pulang)
 $q_alpa = mysqli_query($connection, "SELECT COUNT(*) as total FROM presensi WHERE id_trainee = '$id_trainee' AND (jam_keluar IS NULL OR jam_keluar = '' OR jam_keluar = '-')");
 $total_alpa = mysqli_fetch_assoc($q_alpa)['total'];
-?>
+?> -->
 
 
 <style>
@@ -176,6 +176,9 @@ $server_time_now = date('Y-m-d H:i:s');
   .parent-date { font-size: 20px; }
   .parent-clock { font-size: 30px; font-weight: bold; }
 
+  .server-badge { font-size: 11px; color: #9ca3af; font-style: italic; margin-top: 5px; display: block; }
+
+
   .force-dark .home-clock{
     background: linear-gradient(135deg, #ffffff 0%, #e5e7eb 50%, #9ca3af 100%) !important;
     -webkit-background-clip: text !important;
@@ -190,6 +193,7 @@ $server_time_now = date('Y-m-d H:i:s');
         <div class="home-hero">
           <div id="clock" class="home-clock"></div>
           <div id="date" class="home-date"></div>
+          <span class="server-badge">Waktu terverifikasi oleh Waktu Server Jakarta (WIB)</span>
         </div>
       </div>
     </div>
