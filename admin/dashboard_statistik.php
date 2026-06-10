@@ -359,7 +359,7 @@ const yAxisConfig = {
     }
 };
 
-// 1. Snapshot (Doughnut) -- Pakai (Hari Ini)
+// 1. Snapshot (Doughnut)
 new Chart(document.getElementById('chartSnapshot'), {
     type: 'doughnut',
     plugins: [ChartDataLabels],
@@ -411,7 +411,7 @@ new Chart(document.getElementById('chartSnapshot'), {
 });
 
 
-// 2. Disiplin Divisi (Bar) - Pakai (Hari Ini)
+// 2. Disiplin Divisi (Bar)
 new Chart(document.getElementById('chartDivisi'), {
     type: 'bar',
     data: {
@@ -425,7 +425,7 @@ new Chart(document.getElementById('chartDivisi'), {
 });
 
 
-// 3. Distribusi Komposisi Kehadiran Divisi (Hari Ini) - VERSI MAKSIMAL & RAPI
+// 3. Distribusi Komposisi Kehadiran Divisi (Hari Ini)
 new Chart(document.getElementById('chartPieDivisi'), {
     type: 'pie',
     plugins: [ChartDataLabels],
@@ -478,7 +478,7 @@ new Chart(document.getElementById('chartPieDivisi'), {
 });
 
 
-// 4. Top 5 Trainee (TETEP BULANAN)
+// 4. Top 5 Trainee
 new Chart(document.getElementById('chartTopTrainee'), {
     type: 'bar',
     data: {
@@ -542,7 +542,7 @@ new Chart(document.getElementById('chartTrend'), {
     }
 });
 
-// 7. Jam Masuk (Bar) - Pakai (Hari Ini)
+// 7. Jam Masuk (Bar)
 new Chart(document.getElementById('chartJam'), {
     type: 'bar',
     data: {
